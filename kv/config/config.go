@@ -50,7 +50,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.RaftElectionTimeoutTicks <= c.RaftHeartbeatTicks {
-		return fmt.Errorf("election tick must be greater than heartbeat tick.")
+		return fmt.Errorf("election tick must be greater than heartbeat tick")
 	}
 
 	return nil

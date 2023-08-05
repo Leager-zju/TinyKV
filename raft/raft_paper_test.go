@@ -455,6 +455,7 @@ func TestLeaderAcknowledgeCommit2AB(t *testing.T) {
 		{5, map[uint64]bool{2: true, 3: true, 4: true, 5: true}, true},
 	}
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		s := NewMemoryStorage()
 		r := newTestRaft(1, idsBySize(tt.size), 10, 1, s)
 		r.becomeCandidate()
@@ -488,6 +489,7 @@ func TestLeaderCommitPrecedingEntries2AB(t *testing.T) {
 		{{Term: 1, Index: 1}},
 	}
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		storage := NewMemoryStorage()
 		storage.Append(tt)
 		r := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, storage)
@@ -502,6 +504,7 @@ func TestLeaderCommitPrecedingEntries2AB(t *testing.T) {
 
 		li := uint64(len(tt))
 		wents := append(tt, pb.Entry{Term: 3, Index: li + 1}, pb.Entry{Term: 3, Index: li + 2, Data: []byte("some data")})
+		DPrintf("%v", r.RaftLog.entries)
 		if g := r.RaftLog.nextEnts(); !reflect.DeepEqual(g, wents) {
 			t.Errorf("#%d: ents = %+v, want %+v", i, g, wents)
 		}
@@ -592,11 +595,11 @@ func TestFollowerCheckMessageType_MsgAppend2AB(t *testing.T) {
 		r := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, storage)
 		r.RaftLog.committed = 1
 		r.becomeFollower(2, 2)
-		msgs := r.readMessages() // clear message
+		r.readMessages() // clear message
 
 		r.Step(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgAppend, Term: 2, LogTerm: tt.term, Index: tt.index})
 
-		msgs = r.readMessages()
+		msgs := r.readMessages()
 		if len(msgs) != 1 {
 			t.Errorf("#%d: len(msgs) = %+v, want %+v", i, len(msgs), 1)
 		}
@@ -648,6 +651,7 @@ func TestFollowerAppendEntries2AB(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		storage := NewMemoryStorage()
 		storage.Append([]pb.Entry{{Term: 1, Index: 1}, {Term: 2, Index: 2}})
 		r := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, storage)
@@ -728,11 +732,13 @@ func TestLeaderSyncFollowerLog2AB(t *testing.T) {
 		},
 	}
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		leadStorage := NewMemoryStorage()
 		leadStorage.Append(ents)
 		lead := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, leadStorage)
-		lead.Term = term
-		lead.RaftLog.committed = lead.RaftLog.LastIndex()
+		lead.Term = term                                  // 8
+		lead.RaftLog.committed = lead.RaftLog.LastIndex() // 10
+
 		followerStorage := NewMemoryStorage()
 		followerStorage.Append(tt)
 		follower := newTestRaft(2, []uint64{1, 2, 3}, 10, 1, followerStorage)

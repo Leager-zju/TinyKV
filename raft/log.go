@@ -18,9 +18,9 @@ import pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 
 // RaftLog manage the log entries, its struct look like:
 //
-//  snapshot/first.....applied....committed....stabled.....last
-//  --------|------------------------------------------------|
-//                            log entries
+//	snapshot/first.....applied....committed....stabled.....last
+//	--------|------------------------------------------------|
+//	                          log entries
 //
 // for simplify the RaftLog implement should manage all log entries
 // that not truncated
@@ -56,7 +56,25 @@ type RaftLog struct {
 // to the state that it just commits and applies the latest snapshot.
 func newLog(storage Storage) *RaftLog {
 	// Your Code Here (2A).
-	return nil
+	log := &RaftLog{
+		storage:         storage,
+		committed:       0,
+		applied:         0,
+		stabled:         0,
+		entries:         []pb.Entry{{Index: 0, Term: 0}},
+		pendingSnapshot: &pb.Snapshot{},
+	}
+	first_index, _ := storage.FirstIndex()
+	last_index, _ := storage.LastIndex()
+	entries, _ := storage.Entries(first_index, last_index+1)
+
+	log.stabled = last_index
+	log.entries = append(log.entries, entries...)
+	return log
+}
+
+func (l *RaftLog) appendEntry(e pb.Entry) {
+	l.entries = append(l.entries, e)
 }
 
 // We need to compact the log entries in some point of time like
@@ -71,29 +89,44 @@ func (l *RaftLog) maybeCompact() {
 // note, this is one of the test stub functions you need to implement.
 func (l *RaftLog) allEntries() []pb.Entry {
 	// Your Code Here (2A).
-	return nil
+	return l.entries[1:]
 }
 
 // unstableEntries return all the unstable entries
 func (l *RaftLog) unstableEntries() []pb.Entry {
 	// Your Code Here (2A).
-	return nil
+	return l.entries[l.stabled+1:]
 }
 
 // nextEnts returns all the committed but not applied entries
 func (l *RaftLog) nextEnts() (ents []pb.Entry) {
 	// Your Code Here (2A).
-	return nil
+	return l.entries[l.applied+1 : l.committed+1]
+}
+
+// LastTerm return the last term of the log entries
+func (l *RaftLog) LastTerm() uint64 {
+	// Your Code Here (2A).
+	if len(l.entries) == 0 {
+		return 0
+	}
+	return l.entries[len(l.entries)-1].GetTerm()
 }
 
 // LastIndex return the last index of the log entries
 func (l *RaftLog) LastIndex() uint64 {
 	// Your Code Here (2A).
-	return 0
+	if len(l.entries) == 0 {
+		return 0
+	}
+	return l.entries[len(l.entries)-1].GetIndex()
 }
 
 // Term return the term of the entry in the given index
-func (l *RaftLog) Term(i uint64) (uint64, error) {
+func (l *RaftLog) Term(i uint64) (result uint64, err error) {
 	// Your Code Here (2A).
-	return 0, nil
+	if i >= uint64(len(l.entries)) {
+		return 0, pb.ErrIntOverflowEraftpb
+	}
+	return l.entries[i].GetTerm(), nil
 }

@@ -272,6 +272,7 @@ func TestLogReplication2AB(t *testing.T) {
 	}
 
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgHup})
 
 		for _, m := range tt.msgs {
@@ -279,18 +280,19 @@ func TestLogReplication2AB(t *testing.T) {
 		}
 
 		for j, x := range tt.network.peers {
+			DPrintf("### TEST %d.%d ###", i, j)
 			sm := x.(*Raft)
 
 			if sm.RaftLog.committed != tt.wcommitted {
 				t.Errorf("#%d.%d: committed = %d, want %d", i, j, sm.RaftLog.committed, tt.wcommitted)
 			}
-
 			ents := []pb.Entry{}
 			for _, e := range nextEnts(sm, tt.network.storage[j]) {
 				if e.Data != nil {
 					ents = append(ents, e)
 				}
 			}
+
 			props := []pb.Message{}
 			for _, m := range tt.msgs {
 				if m.MsgType == pb.MessageType_MsgPropose {
@@ -534,6 +536,7 @@ func TestProposal2AB(t *testing.T) {
 	}
 
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		data := []byte("somedata")
 
 		// promote 1 to become leader
@@ -562,10 +565,10 @@ func TestProposal2AB(t *testing.T) {
 }
 
 // TestHandleMessageType_MsgAppend ensures:
-// 1. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm.
-// 2. If an existing entry conflicts with a new one (same index but different terms),
-//    delete the existing entry and all that follow it; append any new entries not already in the log.
-// 3. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
+//  1. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm.
+//  2. If an existing entry conflicts with a new one (same index but different terms),
+//     delete the existing entry and all that follow it; append any new entries not already in the log.
+//  3. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry).
 func TestHandleMessageType_MsgAppend2AB(t *testing.T) {
 	tests := []struct {
 		m       pb.Message
@@ -592,6 +595,7 @@ func TestHandleMessageType_MsgAppend2AB(t *testing.T) {
 	}
 
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		storage := NewMemoryStorage()
 		storage.Append([]pb.Entry{{Index: 1, Term: 1}, {Index: 2, Term: 2}})
 		sm := newTestRaft(1, []uint64{1}, 10, 1, storage)
@@ -710,6 +714,7 @@ func TestAllServerStepdown2AB(t *testing.T) {
 	tterm := uint64(3)
 
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		sm := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
 		switch tt.state {
 		case StateFollower:
@@ -741,7 +746,7 @@ func TestAllServerStepdown2AB(t *testing.T) {
 				wlead = None
 			}
 			if sm.Lead != wlead {
-				t.Errorf("#%d, sm.Lead = %d, want %d", i, sm.Lead, wlead)
+				t.Errorf("#%d.%d, sm.Lead = %d, want %d", i, j, sm.Lead, wlead)
 			}
 		}
 	}
@@ -911,6 +916,7 @@ func TestHeartbeatUpdateCommit2AB(t *testing.T) {
 		{5, 10},
 	}
 	for i, tt := range tests {
+		DPrintf("### TEST %d ###", i)
 		sm1 := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
 		sm2 := newTestRaft(2, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
 		sm3 := newTestRaft(3, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
