@@ -99,6 +99,7 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	r.Lead = m.GetFrom()
 	r.clearVote()
 	r.resetElectionElapsed()
+	r.updateReady()
 }
 
 // handleAppendEntriesResponse handle AppendEntriesResponse RPC request
@@ -179,11 +180,11 @@ func (r *Raft) handleHeartbeat(m pb.Message) {
 	r.Lead = m.GetFrom()
 	r.clearVote()
 	r.resetElectionElapsed()
+	r.updateReady()
 }
 
 // handleHeartbeatResponse handle HeartbeatResponse RPC request
 func (r *Raft) handleHeartbeatResponse(m pb.Message) {
-	// Your Code Here (2A).
 	if m.GetTerm() > r.Term {
 		r.becomeFollower(m.GetTerm(), None)
 	}
@@ -211,6 +212,7 @@ func (r *Raft) proposeEntry(m pb.Message) {
 	}
 	r.Prs[r.id].Match = r.RaftLog.LastIndex()
 	r.Prs[r.id].Next = r.RaftLog.LastIndex() + 1
+	r.updateReady()
 	if len(r.Prs) == 1 {
 		r.updateCommitted()
 	} else {

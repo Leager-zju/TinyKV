@@ -116,6 +116,10 @@ type Raft struct {
 	Term uint64
 	Vote uint64
 
+	// NEED TO PERSIST
+	hasReady bool
+	ready    Ready
+
 	// the log
 	RaftLog *RaftLog
 
@@ -129,10 +133,10 @@ type Raft struct {
 	votes map[uint64]bool
 
 	// num of vote for myself
-	vote_cnt uint64
+	voteCnt uint64
 
 	// num of reject for myself
-	reject_cnt uint64
+	rejectCnt uint64
 
 	// msgs need to send
 	msgs []pb.Message
@@ -173,19 +177,19 @@ func newRaft(c *Config) *Raft {
 	if err := c.validate(); err != nil {
 		panic(err.Error())
 	}
-	// Your Code Here (2A).
 	hardState, _, _ := c.Storage.InitialState()
 	raft := &Raft{
 		mu:               sync.RWMutex{},
 		id:               c.ID,
 		Term:             hardState.Term,
 		Vote:             hardState.Vote,
+		hasReady:         false,
 		RaftLog:          newLog(c.Storage),
 		Prs:              make(map[uint64]*Progress, len(c.peers)),
 		State:            StateFollower,
 		votes:            make(map[uint64]bool, len(c.peers)),
-		vote_cnt:         0,
-		reject_cnt:       0,
+		voteCnt:          0,
+		rejectCnt:        0,
 		msgs:             []pb.Message{},
 		Lead:             None,
 		heartbeatTimeout: c.HeartbeatTick,
@@ -198,7 +202,14 @@ func newRaft(c *Config) *Raft {
 	raft.RaftLog.committed = hardState.Commit
 	raft.RaftLog.applied = c.Applied
 
-	raft.Vote = hardState.Vote
+	raft.ready = Ready{
+		SoftState:        nil,
+		HardState:        pb.HardState{},
+		Entries:          []pb.Entry{},
+		Snapshot:         pb.Snapshot{},
+		CommittedEntries: raft.RaftLog.nextEnts(),
+		Messages:         nil,
+	}
 
 	// read persist
 	for _, peer := range c.peers {
@@ -219,7 +230,6 @@ func (r *Raft) sendNewMsg(msg *pb.Message) {
 
 // tick advances the internal logical clock by a single tick.
 func (r *Raft) tick() {
-	// Your Code Here (2A).
 	if r.State != StateLeader { // Follower / Candidate
 		r.electionElapsed++
 		if r.electionElapsed >= r.getElectionTimeout() {
@@ -237,7 +247,6 @@ func (r *Raft) tick() {
 // Step the entrance of handle message, see `MessageType`
 // on `eraftpb.proto` for what msgs should be handled
 func (r *Raft) Step(m pb.Message) error {
-	// Your Code Here (2A).
 	DPrintf("[%s] Step {%s}", RaftToString(r), MessageToString(m))
 	switch m.MsgType {
 	case pb.MessageType_MsgHup:
@@ -264,6 +273,7 @@ func (r *Raft) Step(m pb.Message) error {
 	case pb.MessageType_MsgRequestVoteResponse:
 		r.handleRequestVoteResponse(m)
 	case pb.MessageType_MsgSnapshot:
+		// r.handleSnapshot(m)
 	case pb.MessageType_MsgHeartbeat:
 		r.handleHeartbeat(m)
 	case pb.MessageType_MsgHeartbeatResponse:

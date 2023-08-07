@@ -10,8 +10,6 @@ import (
 
 const DEBUG bool = false
 
-// const DEBUG bool = false
-
 func DPrintf(format string, a ...interface{}) {
 	if DEBUG {
 		log.Printf(format, a...)
@@ -69,11 +67,38 @@ func (r *Raft) resetHeartbeatElapsed() {
 
 func (r *Raft) clearVote() {
 	r.Vote = None
-	r.vote_cnt = 0
-	r.reject_cnt = 0
+	r.voteCnt = 0
+	r.rejectCnt = 0
 	for peer := range r.votes {
 		r.votes[peer] = false
 	}
+}
+
+func (r *Raft) updateReady() {
+	DPrintf("Update Ready")
+	r.ready = Ready{
+		SoftState: &SoftState{
+			Lead:      r.Lead,
+			RaftState: r.State,
+		},
+		HardState: pb.HardState{
+			Term:   r.Term,
+			Vote:   r.Vote,
+			Commit: r.RaftLog.committed,
+		},
+		Entries:          r.RaftLog.unstableEntries(),
+		CommittedEntries: r.RaftLog.nextEnts(),
+		Messages:         nil,
+	}
+	if len(r.msgs) > 0 {
+		r.ready.Messages = r.msgs
+	}
+	r.ready.Snapshot, _ = r.RaftLog.storage.Snapshot()
+	r.hasReady = true
+}
+
+func (r *Raft) clearReady() {
+	r.hasReady = false
 }
 
 func (r *Raft) updateCommitted() {
@@ -96,6 +121,7 @@ func (r *Raft) updateCommitted() {
 
 		if cnt > int(r.getQuorum()) {
 			r.RaftLog.committed = N
+			r.updateReady()
 			r.startAppend()
 			return
 		}
@@ -104,9 +130,9 @@ func (r *Raft) updateCommitted() {
 
 // becomeFollower transform this peer's state to Follower
 func (r *Raft) becomeFollower(term uint64, lead uint64) {
-	// Your Code Here (2A).
 	r.Term, r.State, r.Lead = term, StateFollower, lead
 	r.clearVote()
+	r.updateReady()
 }
 
 // becomeCandidate transform this peer's state to candidate
@@ -119,10 +145,11 @@ func (r *Raft) becomeCandidate() {
 	r.State = StateCandidate
 	r.Term++
 	r.Vote = r.id
-	r.vote_cnt = 1
+	r.voteCnt = 1
 	r.votes[r.id] = true
 	r.resetElectionElapsed()
-	if r.vote_cnt > r.getQuorum() {
+	r.updateReady()
+	if r.voteCnt > r.getQuorum() {
 		r.becomeLeader()
 		r.resetHeartbeatElapsed()
 	}
@@ -130,9 +157,9 @@ func (r *Raft) becomeCandidate() {
 
 // becomeLeader transform this peer's state to leader
 func (r *Raft) becomeLeader() {
-	// Your Code Here (2A).
 	// NOTE: Leader should propose a noop entry on its term
 	r.State = StateLeader
+	r.updateReady()
 	r.proposeNoopEntry()
 }
 

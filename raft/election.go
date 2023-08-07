@@ -62,6 +62,7 @@ func (r *Raft) handleRequestVote(m pb.Message) {
 	r.Vote = m.GetFrom()
 	r.votes[m.GetFrom()] = true
 	r.resetElectionElapsed()
+	r.updateReady()
 }
 
 // handleRequestVoteResponse handle RequestVoteResponse RPC request
@@ -73,13 +74,13 @@ func (r *Raft) handleRequestVoteResponse(m pb.Message) {
 
 	if m.GetTerm() == r.Term && r.State == StateCandidate {
 		if m.GetReject() {
-			r.reject_cnt++
-			if r.reject_cnt > r.getQuorum() {
+			r.rejectCnt++
+			if r.rejectCnt > r.getQuorum() {
 				r.becomeFollower(r.Term, None)
 			}
 		} else {
-			r.vote_cnt++
-			if r.vote_cnt > r.getQuorum() {
+			r.voteCnt++
+			if r.voteCnt > r.getQuorum() {
 				r.becomeLeader()
 				r.resetHeartbeatElapsed()
 			}

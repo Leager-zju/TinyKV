@@ -55,7 +55,6 @@ type RaftLog struct {
 // newLog returns log using the given storage. It recovers the log
 // to the state that it just commits and applies the latest snapshot.
 func newLog(storage Storage) *RaftLog {
-	// Your Code Here (2A).
 	log := &RaftLog{
 		storage:         storage,
 		committed:       0,
@@ -88,25 +87,24 @@ func (l *RaftLog) maybeCompact() {
 // note, exclude any dummy entries from the return value.
 // note, this is one of the test stub functions you need to implement.
 func (l *RaftLog) allEntries() []pb.Entry {
-	// Your Code Here (2A).
 	return l.entries[1:]
 }
 
 // unstableEntries return all the unstable entries
 func (l *RaftLog) unstableEntries() []pb.Entry {
-	// Your Code Here (2A).
+	if l.stabled >= uint64(len(l.entries))-1 {
+		return []pb.Entry{}
+	}
 	return l.entries[l.stabled+1:]
 }
 
 // nextEnts returns all the committed but not applied entries
 func (l *RaftLog) nextEnts() (ents []pb.Entry) {
-	// Your Code Here (2A).
 	return l.entries[l.applied+1 : l.committed+1]
 }
 
 // LastTerm return the last term of the log entries
 func (l *RaftLog) LastTerm() uint64 {
-	// Your Code Here (2A).
 	if len(l.entries) == 0 {
 		return 0
 	}
@@ -115,7 +113,6 @@ func (l *RaftLog) LastTerm() uint64 {
 
 // LastIndex return the last index of the log entries
 func (l *RaftLog) LastIndex() uint64 {
-	// Your Code Here (2A).
 	if len(l.entries) == 0 {
 		return 0
 	}
@@ -124,7 +121,6 @@ func (l *RaftLog) LastIndex() uint64 {
 
 // Term return the term of the entry in the given index
 func (l *RaftLog) Term(i uint64) (result uint64, err error) {
-	// Your Code Here (2A).
 	if i >= uint64(len(l.entries)) {
 		return 0, pb.ErrIntOverflowEraftpb
 	}
