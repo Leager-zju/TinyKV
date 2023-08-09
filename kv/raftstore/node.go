@@ -57,7 +57,7 @@ func (n *Node) Start(ctx context.Context, engines *engine_util.Engines, trans Tr
 	}
 	newCluster := firstRegion != nil
 	if newCluster {
-		log.Infof("try bootstrap cluster, storeID: %d, region: %s", storeID, firstRegion)
+		DPrintf("try bootstrap cluster, storeID: %d, region: %s", storeID, firstRegion)
 		newCluster, err = n.BootstrapCluster(ctx, engines, firstRegion)
 		if err != nil {
 			return err
@@ -145,12 +145,12 @@ func (n *Node) prepareBootstrapCluster(ctx context.Context, engines *engine_util
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("alloc first region id, regionID: %d, clusterID: %d, storeID: %d", regionID, n.clusterID, storeID)
+	DPrintf("alloc first region id, regionID: %d, clusterID: %d, storeID: %d", regionID, n.clusterID, storeID)
 	peerID, err := n.allocID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("alloc first peer id for first region, peerID: %d, regionID: %d", peerID, regionID)
+	DPrintf("alloc first peer id for first region, peerID: %d, regionID: %d", peerID, regionID)
 
 	return PrepareBootstrap(engines, storeID, regionID, peerID)
 }
@@ -169,7 +169,7 @@ func (n *Node) BootstrapCluster(ctx context.Context, engines *engine_util.Engine
 		}
 		resErr := res.GetHeader().GetError()
 		if resErr == nil {
-			log.Infof("bootstrap cluster ok, clusterID: %d", n.clusterID)
+			DPrintf("bootstrap cluster ok, clusterID: %d", n.clusterID)
 			return true, ClearPrepareBootstrapState(engines)
 		}
 		if resErr.GetType() == schedulerpb.ErrorType_ALREADY_BOOTSTRAPPED {
@@ -181,7 +181,7 @@ func (n *Node) BootstrapCluster(ctx context.Context, engines *engine_util.Engine
 			if region.GetId() == regionID {
 				return false, ClearPrepareBootstrapState(engines)
 			}
-			log.Infof("cluster is already bootstrapped, clusterID: %v", n.clusterID)
+			DPrintf("cluster is already bootstrapped, clusterID: %v", n.clusterID)
 			return false, ClearPrepareBootstrap(engines, regionID)
 		}
 		log.Errorf("bootstrap cluster, clusterID: %v, err: %v", n.clusterID, resErr)
@@ -190,12 +190,12 @@ func (n *Node) BootstrapCluster(ctx context.Context, engines *engine_util.Engine
 }
 
 func (n *Node) startNode(engines *engine_util.Engines, trans Transport, snapMgr *snap.SnapManager) error {
-	log.Infof("start raft store node, storeID: %d", n.store.GetId())
+	DPrintf("start raft store node, storeID: %d", n.store.GetId())
 	return n.system.start(n.store, n.cfg, engines, trans, n.schedulerClient, snapMgr)
 }
 
 func (n *Node) stopNode(storeID uint64) {
-	log.Infof("stop raft store thread, storeID: %d", storeID)
+	DPrintf("stop raft store thread, storeID: %d", storeID)
 	n.system.shutDown()
 }
 

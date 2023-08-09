@@ -101,7 +101,7 @@ func networkchaos(t *testing.T, cluster *Cluster, ch chan bool, done *int32, unr
 				}
 			}
 			cluster.ClearFilters()
-			log.Infof("partition: %v, %v", pa[0], pa[1])
+			// log.Infof("partition: %v, %v", pa[0], pa[1])
 			cluster.AddFilter(&PartitionFilter{
 				s1: pa[0],
 				s2: pa[1],
@@ -178,7 +178,6 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 	cluster := NewTestCluster(nservers, cfg)
 	cluster.Start()
 	defer cluster.Shutdown()
-
 	electionTimeout := cfg.RaftBaseTickInterval * time.Duration(cfg.RaftElectionTimeoutTicks)
 	// Wait for leader election
 	time.Sleep(2 * electionTimeout)
@@ -207,14 +206,14 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 				if (rand.Int() % 1000) < 500 {
 					key := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", j)
 					value := "x " + strconv.Itoa(cli) + " " + strconv.Itoa(j) + " y"
-					// log.Infof("%d: client new put %v,%v\n", cli, key, value)
+					// log.Infof("%d: client new put %v,%v", cli, key, value)
 					cluster.MustPut([]byte(key), []byte(value))
 					last = NextValue(last, value)
 					j++
 				} else {
 					start := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", 0)
 					end := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", j)
-					// log.Infof("%d: client new scan %v-%v\n", cli, start, end)
+					// log.Infof("%d: client new scan %v-%v", cli, start, end)
 					values := cluster.Scan([]byte(start), []byte(end))
 					v := string(bytes.Join(values, []byte("")))
 					if v != last {
@@ -250,18 +249,18 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			time.Sleep(electionTimeout)
 		}
 
-		// log.Printf("wait for clients\n")
+		// log.Infof("wait for clients\n")
 		<-ch_clients
 
 		if crash {
-			log.Warnf("shutdown servers\n")
+			// log.Warnf("shutdown servers\n")
 			for i := 1; i <= nservers; i++ {
 				cluster.StopServer(uint64(i))
 			}
 			// Wait for a while for servers to shutdown, since
 			// shutdown isn't a real crash and isn't instantaneous
 			time.Sleep(electionTimeout)
-			log.Warnf("restart servers\n")
+			// log.Warnf("restart servers\n")
 			// crash and re-start all
 			for i := 1; i <= nservers; i++ {
 				cluster.StartServer(uint64(i))
@@ -269,7 +268,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		}
 
 		for cli := 0; cli < nclients; cli++ {
-			// log.Printf("read from clients %d\n", cli)
+			// log.Infof("read from clients %d\n", cli)
 			j := <-clnts[cli]
 
 			// if j < 10 {

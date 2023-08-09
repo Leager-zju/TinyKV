@@ -2,8 +2,9 @@ package raft
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
+
+	"github.com/pingcap-incubator/tinykv/log"
 
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
@@ -12,7 +13,7 @@ const DEBUG bool = false
 
 func DPrintf(format string, a ...interface{}) {
 	if DEBUG {
-		log.Printf(format, a...)
+		log.Infof(format, a...)
 	}
 }
 
@@ -74,41 +75,14 @@ func (r *Raft) clearVote() {
 	}
 }
 
-func (r *Raft) updateReady() {
-	DPrintf("Update Ready")
-	r.ready = Ready{
-		SoftState: &SoftState{
-			Lead:      r.Lead,
-			RaftState: r.State,
-		},
-		HardState: pb.HardState{
-			Term:   r.Term,
-			Vote:   r.Vote,
-			Commit: r.RaftLog.committed,
-		},
-		Entries:          r.RaftLog.unstableEntries(),
-		CommittedEntries: r.RaftLog.nextEnts(),
-		Messages:         nil,
-	}
-	if len(r.msgs) > 0 {
-		r.ready.Messages = r.msgs
-	}
-	r.ready.Snapshot, _ = r.RaftLog.storage.Snapshot()
-	r.hasReady = true
-}
-
-func (r *Raft) clearReady() {
-	r.hasReady = false
-}
-
 func (r *Raft) updateCommitted() {
-	var N uint64 = 0
+	var N uint64 = r.RaftLog.truncatedIndex
 	for peer := range r.Prs {
 		N = max(N, r.Prs[peer].Match)
 	}
 
 	for ; N > r.RaftLog.committed; N-- {
-		if r.RaftLog.entries[N].GetTerm() != r.Term {
+		if r.RaftLog.entries[r.RaftLog.Index2idx(N)].GetTerm() != r.Term {
 			continue
 		}
 
@@ -121,7 +95,6 @@ func (r *Raft) updateCommitted() {
 
 		if cnt > int(r.getQuorum()) {
 			r.RaftLog.committed = N
-			r.updateReady()
 			r.startAppend()
 			return
 		}
@@ -132,7 +105,6 @@ func (r *Raft) updateCommitted() {
 func (r *Raft) becomeFollower(term uint64, lead uint64) {
 	r.Term, r.State, r.Lead = term, StateFollower, lead
 	r.clearVote()
-	r.updateReady()
 }
 
 // becomeCandidate transform this peer's state to candidate
@@ -148,10 +120,9 @@ func (r *Raft) becomeCandidate() {
 	r.voteCnt = 1
 	r.votes[r.id] = true
 	r.resetElectionElapsed()
-	r.updateReady()
+
 	if r.voteCnt > r.getQuorum() {
 		r.becomeLeader()
-		r.resetHeartbeatElapsed()
 	}
 }
 
@@ -159,7 +130,7 @@ func (r *Raft) becomeCandidate() {
 func (r *Raft) becomeLeader() {
 	// NOTE: Leader should propose a noop entry on its term
 	r.State = StateLeader
-	r.updateReady()
+	r.resetHeartbeatElapsed()
 	r.proposeNoopEntry()
 }
 

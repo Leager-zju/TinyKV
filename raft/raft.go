@@ -116,10 +116,6 @@ type Raft struct {
 	Term uint64
 	Vote uint64
 
-	// NEED TO PERSIST
-	hasReady bool
-	ready    Ready
-
 	// the log
 	RaftLog *RaftLog
 
@@ -177,44 +173,28 @@ func newRaft(c *Config) *Raft {
 	if err := c.validate(); err != nil {
 		panic(err.Error())
 	}
-	hardState, _, _ := c.Storage.InitialState()
+	hardState, confState, _ := c.Storage.InitialState()
 	raft := &Raft{
 		mu:               sync.RWMutex{},
 		id:               c.ID,
 		Term:             hardState.Term,
 		Vote:             hardState.Vote,
-		hasReady:         false,
 		RaftLog:          newLog(c.Storage),
-		Prs:              make(map[uint64]*Progress, len(c.peers)),
+		Prs:              make(map[uint64]*Progress, len(confState.Nodes)),
 		State:            StateFollower,
-		votes:            make(map[uint64]bool, len(c.peers)),
-		voteCnt:          0,
-		rejectCnt:        0,
+		votes:            make(map[uint64]bool, len(confState.Nodes)),
 		msgs:             []pb.Message{},
 		Lead:             None,
 		heartbeatTimeout: c.HeartbeatTick,
 		electionTimeout:  c.ElectionTick,
-		heartbeatElapsed: 0,
-		electionElapsed:  0,
-		leadTransferee:   None,
 		PendingConfIndex: 0,
 	}
-	raft.RaftLog.committed = hardState.Commit
 	raft.RaftLog.applied = c.Applied
 
-	raft.ready = Ready{
-		SoftState:        nil,
-		HardState:        pb.HardState{},
-		Entries:          []pb.Entry{},
-		Snapshot:         pb.Snapshot{},
-		CommittedEntries: raft.RaftLog.nextEnts(),
-		Messages:         nil,
-	}
-
 	// read persist
-	for _, peer := range c.peers {
+	for _, peer := range confState.Nodes {
 		raft.Prs[peer] = &Progress{
-			Match: 0,
+			Match: raft.RaftLog.TruncatedIndex(),
 			Next:  raft.RaftLog.LastIndex() + 1,
 		}
 		raft.votes[peer] = false
@@ -224,7 +204,7 @@ func newRaft(c *Config) *Raft {
 }
 
 func (r *Raft) sendNewMsg(msg *pb.Message) {
-	DPrintf("[%s] Send Msg {%s}", RaftToString(r), MessageToString(*msg))
+	// DPrintf("[%s] Send Msg {%s}", RaftToString(r), MessageToString(*msg))
 	r.msgs = append(r.msgs, *msg)
 }
 
@@ -238,8 +218,7 @@ func (r *Raft) tick() {
 	} else { // Leader
 		r.heartbeatElapsed++
 		if r.heartbeatElapsed >= r.getHeartbeatTimeout() {
-			r.resetElectionElapsed()
-			r.startHeartbeat()
+			r.Step(pb.Message{MsgType: pb.MessageType_MsgBeat})
 		}
 	}
 }
@@ -253,12 +232,12 @@ func (r *Raft) Step(m pb.Message) error {
 		if r.State != StateLeader {
 			r.becomeCandidate()
 		}
-		if r.State == StateCandidate {
+		if r.State == StateCandidate { // if only one peer, it will be leader
 			r.electionTimeoutEvent()
 		}
 	case pb.MessageType_MsgBeat:
 		if r.State == StateLeader {
-			r.startHeartbeat()
+			r.heartbeatTimeoutEvent()
 		}
 	case pb.MessageType_MsgPropose:
 		if r.State == StateLeader {
@@ -273,7 +252,7 @@ func (r *Raft) Step(m pb.Message) error {
 	case pb.MessageType_MsgRequestVoteResponse:
 		r.handleRequestVoteResponse(m)
 	case pb.MessageType_MsgSnapshot:
-		// r.handleSnapshot(m)
+		r.handleSnapshot(m)
 	case pb.MessageType_MsgHeartbeat:
 		r.handleHeartbeat(m)
 	case pb.MessageType_MsgHeartbeatResponse:

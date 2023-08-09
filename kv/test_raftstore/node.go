@@ -195,6 +195,7 @@ func (c *NodeSimulator) GetStoreIds() []uint64 {
 	storeIDs := make([]uint64, 0, len(c.nodes))
 	for storeID := range c.nodes {
 		storeIDs = append(storeIDs, storeID)
+
 	}
 	return storeIDs
 }

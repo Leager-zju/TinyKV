@@ -1,6 +1,9 @@
 package raft
 
-import pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
+import (
+	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
+	"github.com/pingcap-incubator/tinykv/proto/pkg/raft_cmdpb"
+)
 
 func (r *Raft) startAppend() {
 	for peer := range r.Prs {
@@ -24,14 +27,14 @@ func (r *Raft) sendAppend(to uint64) bool {
 	}
 	defer r.sendNewMsg(request)
 
-	next_idx := r.Prs[to].Next
-	prev_idx := next_idx - 1
+	nextIndex := r.Prs[to].Next
+	prevIndex := nextIndex - 1
 
-	for idx := next_idx; idx < uint64(len(r.RaftLog.entries)); idx++ {
+	for idx := r.RaftLog.Index2idx(nextIndex); idx < r.RaftLog.length(); idx++ {
 		request.Entries = append(request.Entries, &r.RaftLog.entries[idx])
 	}
-	request.LogTerm, _ = r.RaftLog.Term(prev_idx)
-	request.Index = prev_idx
+	request.LogTerm, _ = r.RaftLog.Term(prevIndex)
+	request.Index = prevIndex
 	return true
 }
 
@@ -57,31 +60,32 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 		response.Term = r.Term
 	}
 
-	prev_log_index, prev_log_term := m.GetIndex(), m.GetLogTerm()
-	term, _ := r.RaftLog.Term(prev_log_index)
-	if prev_log_index > r.RaftLog.LastIndex() || (term != prev_log_term && prev_log_index != 0) { // Err Log Doesn't Match
+	prevLogIndex, prevLogTerm := m.GetIndex(), m.GetLogTerm()
+	term, _ := r.RaftLog.Term(prevLogIndex)
+	if prevLogIndex > r.RaftLog.LastIndex() || (term != prevLogTerm && prevLogIndex != 0) { // Err Log Doesn't Match
 		response.Reject = true
 		return
 	}
 
-	last_new_log_index := getLastLogIndex(&m)
+	lastNewLogIndex := getLastLogIndex(&m)
 	if len(m.Entries) > 0 {
-		base_new_log_index := m.Entries[0].GetIndex()
+		baseNewLogIndex := m.Entries[0].GetIndex()
 		// If an existing entry conflicts with a new one (same index
 		// but different terms), delete the existing entry and all that
 		// follow it
-		new_log_index := base_new_log_index
-		for ; new_log_index <= min(r.RaftLog.LastIndex(), last_new_log_index); new_log_index++ {
-			new_log_term, _ := r.RaftLog.Term(new_log_index)
-			if new_log_term != m.Entries[new_log_index-base_new_log_index].GetTerm() {
-				r.RaftLog.entries = r.RaftLog.entries[:new_log_index]
-				r.RaftLog.stabled = min(r.RaftLog.stabled, new_log_index-1)
+		newLogIndex := baseNewLogIndex
+		for ; newLogIndex <= min(r.RaftLog.LastIndex(), lastNewLogIndex); newLogIndex++ {
+			newLogTerm, _ := r.RaftLog.Term(newLogIndex)
+			if newLogTerm != m.Entries[newLogIndex-baseNewLogIndex].GetTerm() {
+				r.RaftLog.entries = r.RaftLog.entries[:r.RaftLog.Index2idx(newLogIndex)]
+				r.RaftLog.stabled = min(r.RaftLog.stabled, newLogIndex-1)
 				break
 			}
 		}
-		for ; new_log_index <= last_new_log_index; new_log_index++ {
-			r.RaftLog.entries = append(r.RaftLog.entries, *m.Entries[new_log_index-base_new_log_index])
+		for ; newLogIndex <= lastNewLogIndex; newLogIndex++ {
+			r.RaftLog.entries = append(r.RaftLog.entries, *m.Entries[newLogIndex-baseNewLogIndex])
 		}
+		r.RaftLog.updateLastAppend()
 	}
 
 	// if len(m.Entries) == 0
@@ -92,14 +96,13 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	// else
 	//    update committed as normal
 	if m.GetCommit() > r.RaftLog.committed {
-		r.RaftLog.committed = min(m.GetCommit(), last_new_log_index)
+		r.RaftLog.committed = min(m.GetCommit(), lastNewLogIndex)
 	}
-	response.Index = last_new_log_index
+	response.Index = lastNewLogIndex
 
 	r.Lead = m.GetFrom()
 	r.clearVote()
 	r.resetElectionElapsed()
-	r.updateReady()
 }
 
 // handleAppendEntriesResponse handle AppendEntriesResponse RPC request
@@ -121,7 +124,8 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message) {
 	}
 }
 
-func (r *Raft) startHeartbeat() {
+func (r *Raft) heartbeatTimeoutEvent() {
+	r.resetHeartbeatElapsed()
 	for peer := range r.Prs {
 		if peer == r.id {
 			continue
@@ -180,7 +184,6 @@ func (r *Raft) handleHeartbeat(m pb.Message) {
 	r.Lead = m.GetFrom()
 	r.clearVote()
 	r.resetElectionElapsed()
-	r.updateReady()
 }
 
 // handleHeartbeatResponse handle HeartbeatResponse RPC request
@@ -202,18 +205,22 @@ func (r *Raft) proposeNoopEntry() {
 
 func (r *Raft) proposeEntry(m pb.Message) {
 	for _, entry := range m.GetEntries() {
-		new_entry := pb.Entry{
+		newEntry := pb.Entry{
 			EntryType: entry.GetEntryType(),
 			Term:      r.Term,
 			Index:     r.RaftLog.LastIndex() + 1,
 			Data:      entry.GetData(),
 		}
-		r.RaftLog.appendEntry(new_entry)
+		msg := new(raft_cmdpb.RaftCmdRequest)
+		msg.Unmarshal(newEntry.Data)
+		DPrintf("[%s] Propose Msg {%+v} at index %d, term %d", RaftToString(r), msg, newEntry.GetIndex(), newEntry.GetTerm())
+		r.RaftLog.appendEntry(newEntry)
+		r.RaftLog.updateLastAppend()
 	}
 	r.Prs[r.id].Match = r.RaftLog.LastIndex()
 	r.Prs[r.id].Next = r.RaftLog.LastIndex() + 1
-	r.updateReady()
-	if len(r.Prs) == 1 {
+
+	if len(r.Prs) <= 1 {
 		r.updateCommitted()
 	} else {
 		r.startAppend()

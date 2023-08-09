@@ -38,7 +38,7 @@ func createPeer(storeID uint64, cfg *config.Config, sched chan<- worker.Task,
 	if metaPeer == nil {
 		return nil, errors.Errorf("find no peer for store %d in region %v", storeID, region)
 	}
-	log.Infof("region %v create peer with ID %d", region, metaPeer.Id)
+	DPrintf("region %v create peer with ID %d", region, metaPeer.Id)
 	return NewPeer(storeID, cfg, engines, region, sched, metaPeer)
 }
 
@@ -48,7 +48,7 @@ func createPeer(storeID uint64, cfg *config.Config, sched chan<- worker.Task,
 func replicatePeer(storeID uint64, cfg *config.Config, sched chan<- worker.Task,
 	engines *engine_util.Engines, regionID uint64, metaPeer *metapb.Peer) (*peer, error) {
 	// We will remove tombstone key when apply snapshot
-	log.Infof("[region %v] replicates peer with ID %d", regionID, metaPeer.GetId())
+	DPrintf("[region %v] replicates peer with ID %d", regionID, metaPeer.GetId())
 	region := &metapb.Region{
 		Id:          regionID,
 		RegionEpoch: &metapb.RegionEpoch{},
@@ -187,7 +187,7 @@ func (p *peer) nextProposalIndex() uint64 {
 // / Tries to destroy itself. Returns a job (if needed) to do more cleaning tasks.
 func (p *peer) MaybeDestroy() bool {
 	if p.stopped {
-		log.Infof("%v is being destroyed, skip", p.Tag)
+		DPrintf("%v is being destroyed, skip", p.Tag)
 		return false
 	}
 	return true
@@ -200,7 +200,7 @@ func (p *peer) MaybeDestroy() bool {
 func (p *peer) Destroy(engine *engine_util.Engines, keepData bool) error {
 	start := time.Now()
 	region := p.Region()
-	log.Infof("%v begin to destroy", p.Tag)
+	DPrintf("%v begin to destroy", p.Tag)
 
 	// Set Tombstone state explicitly
 	kvWB := new(engine_util.WriteBatch)
@@ -228,7 +228,7 @@ func (p *peer) Destroy(engine *engine_util.Engines, keepData bool) error {
 	}
 	p.proposals = nil
 
-	log.Infof("%v destroy itself, takes %v", p.Tag, time.Now().Sub(start))
+	DPrintf("%v destroy itself, takes %v", p.Tag, time.Now().Sub(start))
 	return nil
 }
 
