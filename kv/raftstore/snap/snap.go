@@ -108,11 +108,11 @@ func NewApplyOptions(db *badger.DB, region *metapb.Region) *ApplyOptions {
 
 // `Snapshot` is an interface for snapshot.
 // It's used in these scenarios:
-//   1. build local snapshot
-//   2. read local snapshot and then replicate it to remote raftstores
-//   3. receive snapshot from remote raftstore and write it to local storage
-//   4. apply snapshot
-//   5. snapshot gc
+//  1. build local snapshot
+//  2. read local snapshot and then replicate it to remote raftstores
+//  3. receive snapshot from remote raftstore and write it to local storage
+//  4. apply snapshot
+//  5. snapshot gc
 type Snapshot interface {
 	io.Reader
 	io.Writer
@@ -546,7 +546,7 @@ func (s *Snap) Build(dbSnap *badger.Txn, region *metapb.Region, snapData *rspb.R
 	if err != nil {
 		return err
 	}
-	log.Infof("region %d scan snapshot %s, key count %d, size %d", region.Id, s.Path(), builder.kvCount, builder.size)
+	log.Debugf("region %d scan snapshot %s, key count %d, size %d", region.Id, s.Path(), builder.kvCount, builder.size)
 	err = s.saveCFFiles()
 	if err != nil {
 		return err
@@ -697,7 +697,7 @@ func (s *Snap) Apply(opts ApplyOptions) error {
 		log.Errorf("ingest sst failed (first %d files succeeded): %s", n, err)
 		return err
 	}
-	log.Infof("apply snapshot ingested %d tables", n)
+	log.Debugf("apply snapshot ingested %d tables", n)
 	return nil
 }
 

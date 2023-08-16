@@ -52,11 +52,6 @@ type RaftLog struct {
 	// the incoming unstable snapshot, if any.
 	// (Used in 2C)
 	pendingSnapshot *pb.Snapshot
-
-	// Your Data Here (2A).
-	truncatedIndex uint64
-
-	lastAppend *pb.Entry
 }
 
 // newLog returns log using the given storage. It recovers the log
@@ -68,16 +63,14 @@ func newLog(storage Storage) *RaftLog {
 	truncatedTerm, _ := storage.Term(truncatedIndex)
 	lastIndex, _ := storage.LastIndex()
 	entries, _ := storage.Entries(firstIndex, lastIndex+1)
-
 	newLog := &RaftLog{
 		storage:         storage,
 		committed:       hardState.Commit,
+		applied:         truncatedIndex,
 		stabled:         lastIndex,
 		entries:         append([]pb.Entry{{Index: truncatedIndex, Term: truncatedTerm}}, entries...),
 		pendingSnapshot: nil,
-		truncatedIndex:  truncatedIndex,
 	}
-	newLog.updateLastAppend()
 	return newLog
 }
 
@@ -85,20 +78,18 @@ func (l *RaftLog) length() uint64 {
 	return uint64(len(l.entries))
 }
 
-func (l *RaftLog) Index2idx(Index uint64) (idx uint64) {
+func (l *RaftLog) Index2idx(Index uint64) uint64 {
 	if Index < l.TruncatedIndex() {
 		panic(fmt.Sprintf("Index %d UnderFlow", Index))
 	}
-	idx = Index - l.TruncatedIndex()
-	return
+	return Index - l.TruncatedIndex()
 }
 
 func (l *RaftLog) LastAppend() *pb.Entry {
-	return l.lastAppend
-}
-
-func (l *RaftLog) updateLastAppend() {
-	l.lastAppend = &l.entries[l.length()-1]
+	if l.length() == 0 {
+		return nil
+	}
+	return &l.entries[l.length()-1]
 }
 
 func (l *RaftLog) appendEntry(e pb.Entry) {
@@ -109,7 +100,17 @@ func (l *RaftLog) appendEntry(e pb.Entry) {
 // storage compact stabled log entries prevent the log entries
 // grow unlimitedly in memory
 func (l *RaftLog) maybeCompact() {
-	// Your Code Here (2C).
+	firstIndex, _ := l.storage.FirstIndex() // change at every CompactLogRequest
+	truncatedIndex := firstIndex - 1
+	truncatedTerm, _ := l.storage.Term(truncatedIndex)
+
+	if l.TruncatedIndex() < truncatedIndex {
+		if truncatedIndex <= l.LastAppend().GetIndex() {
+			l.entries = l.entries[l.Index2idx(truncatedIndex):]
+		} else {
+			l.entries = []pb.Entry{{Term: truncatedTerm, Index: truncatedIndex}}
+		}
+	}
 }
 
 // allEntries return all the entries not compacted.
@@ -119,7 +120,7 @@ func (l *RaftLog) allEntries() []pb.Entry {
 	if len(l.entries) == 1 { // only Truncated Entry
 		return []pb.Entry{}
 	}
-	return l.entries[l.Index2idx(l.TruncatedIndex())+1:]
+	return l.entries[1:]
 }
 
 // unstableEntries return all the unstable entries
@@ -132,17 +133,23 @@ func (l *RaftLog) unstableEntries() []pb.Entry {
 }
 
 // nextEnts returns all the committed but not applied entries
-func (l *RaftLog) nextEnts() (ents []pb.Entry) {
-	appliedBegin, committedBegin := l.Index2idx(l.applied)+1, l.Index2idx(l.committed)+1
+func (l *RaftLog) nextEnts() []pb.Entry {
+	appliedBegin := l.Index2idx(l.applied) + 1
+	committedBegin := l.Index2idx(l.committed) + 1
 
 	if appliedBegin >= l.length() { // all entries are applied, return empty
 		return []pb.Entry{}
 	}
+
 	return l.entries[appliedBegin:committedBegin]
 }
 
 func (l *RaftLog) TruncatedIndex() uint64 {
-	return l.truncatedIndex
+	return l.entries[0].GetIndex()
+}
+
+func (l *RaftLog) TruncatedTerm() uint64 {
+	return l.entries[0].GetTerm()
 }
 
 // LastTerm return the last term of the log entries
@@ -157,5 +164,8 @@ func (l *RaftLog) LastIndex() uint64 {
 
 // Term return the term of the entry in the given index
 func (l *RaftLog) Term(i uint64) (result uint64, err error) {
-	return l.storage.Term(i)
+	if i > l.LastIndex() || i < l.TruncatedIndex() {
+		return 0, pb.ErrIntOverflowEraftpb
+	}
+	return l.entries[l.Index2idx(i)].GetTerm(), nil
 }

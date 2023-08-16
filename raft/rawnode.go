@@ -163,6 +163,7 @@ func (rn *RawNode) Ready() Ready {
 		Lead:      rn.Raft.Lead,
 		RaftState: rn.Raft.State,
 	}
+
 	if !isSoftStateEqual(rn.prevSoftState, newSoftState) {
 		newReady.SoftState = newSoftState
 	}
@@ -172,6 +173,7 @@ func (rn *RawNode) Ready() Ready {
 		Vote:   rn.Raft.Vote,
 		Commit: rn.Raft.RaftLog.committed,
 	}
+
 	if !isHardStateEqual(rn.prevHardState, newHardState) {
 		newReady.HardState = newHardState
 	}
@@ -222,16 +224,15 @@ func (rn *RawNode) Advance(rd Ready) {
 		rn.Raft.RaftLog.stabled = rd.Entries[n-1].Index
 	}
 
-	// if !IsEmptySnap(&rd.Snapshot) {
-	// 	rn.Raft.RaftLog.maybeCompact()
-	// 	rn.Raft.RaftLog.pendingSnapshot = nil
-	// }
+	if !IsEmptySnap(&rd.Snapshot) {
+		rn.Raft.RaftLog.pendingSnapshot = nil
+	}
 
 	if n := len(rd.CommittedEntries); n > 0 {
-		DPrintf("[%d] APPLIED FROM %d UPDATE TO %d", rn.Raft.id, rn.Raft.RaftLog.applied, rd.CommittedEntries[len(rd.CommittedEntries)-1].GetIndex())
 		rn.Raft.RaftLog.applied = rd.CommittedEntries[n-1].GetIndex()
+		rn.Raft.RaftLog.maybeCompact()
 	}
-	
+
 	if len(rd.Messages) > 0 {
 		rn.Raft.msgs = rn.Raft.msgs[:0]
 	}

@@ -18,7 +18,7 @@ func DPrintf(format string, a ...interface{}) {
 }
 
 func RaftToString(r *Raft) string {
-	return fmt.Sprintf("%d %d %s", r.id, r.Term, r.State.String())
+	return fmt.Sprintf("%d %d %s [%d..%d..%d..%d..%d]", r.id, r.Term, r.State.String(), r.RaftLog.TruncatedIndex(), r.RaftLog.applied, r.RaftLog.committed, r.RaftLog.stabled, r.RaftLog.LastIndex())
 }
 
 func MessageToString(m pb.Message) string {
@@ -38,6 +38,7 @@ func MessageToString(m pb.Message) string {
 	case pb.MessageType_MsgRequestVoteResponse:
 		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, Reject: %t}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetReject())
 	case pb.MessageType_MsgSnapshot:
+		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, LastIncludedTerm: %d, LastIncludedIndex: %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetSnapshot().GetMetadata().GetTerm(), m.GetSnapshot().GetMetadata().GetIndex())
 	case pb.MessageType_MsgHeartbeat:
 		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, Committed: %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetCommit())
 	case pb.MessageType_MsgHeartbeatResponse:
@@ -76,7 +77,7 @@ func (r *Raft) clearVote() {
 }
 
 func (r *Raft) updateCommitted() {
-	var N uint64 = r.RaftLog.truncatedIndex
+	var N uint64 = r.RaftLog.TruncatedIndex()
 	for peer := range r.Prs {
 		N = max(N, r.Prs[peer].Match)
 	}

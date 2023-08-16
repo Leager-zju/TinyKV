@@ -18,6 +18,14 @@ func (r *Raft) startAppend() {
 // sendAppend sends an append RPC with new entries (if any) and the
 // current commit index to the given peer. Returns true if a message was sent.
 func (r *Raft) sendAppend(to uint64) bool {
+	nextIndex := r.Prs[to].Next
+	prevIndex := nextIndex - 1
+
+	if nextIndex <= r.RaftLog.TruncatedIndex() {
+		r.sendSnapshot(to)
+		return true
+	}
+
 	request := &pb.Message{
 		MsgType: pb.MessageType_MsgAppend,
 		To:      to,
@@ -26,9 +34,6 @@ func (r *Raft) sendAppend(to uint64) bool {
 		Commit:  r.RaftLog.committed,
 	}
 	defer r.sendNewMsg(request)
-
-	nextIndex := r.Prs[to].Next
-	prevIndex := nextIndex - 1
 
 	for idx := r.RaftLog.Index2idx(nextIndex); idx < r.RaftLog.length(); idx++ {
 		request.Entries = append(request.Entries, &r.RaftLog.entries[idx])
@@ -85,7 +90,6 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 		for ; newLogIndex <= lastNewLogIndex; newLogIndex++ {
 			r.RaftLog.entries = append(r.RaftLog.entries, *m.Entries[newLogIndex-baseNewLogIndex])
 		}
-		r.RaftLog.updateLastAppend()
 	}
 
 	// if len(m.Entries) == 0
@@ -101,7 +105,7 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	response.Index = lastNewLogIndex
 
 	r.Lead = m.GetFrom()
-	r.clearVote()
+	r.clearVote()	
 	r.resetElectionElapsed()
 }
 
@@ -215,10 +219,12 @@ func (r *Raft) proposeEntry(m pb.Message) {
 		msg.Unmarshal(newEntry.Data)
 		DPrintf("[%s] Propose Msg {%+v} at index %d, term %d", RaftToString(r), msg, newEntry.GetIndex(), newEntry.GetTerm())
 		r.RaftLog.appendEntry(newEntry)
-		r.RaftLog.updateLastAppend()
 	}
-	r.Prs[r.id].Match = r.RaftLog.LastIndex()
-	r.Prs[r.id].Next = r.RaftLog.LastIndex() + 1
+
+	if _, ok := r.Prs[r.id]; ok {
+		r.Prs[r.id].Match = r.RaftLog.LastIndex()
+		r.Prs[r.id].Next = r.RaftLog.LastIndex() + 1
+	}
 
 	if len(r.Prs) <= 1 {
 		r.updateCommitted()

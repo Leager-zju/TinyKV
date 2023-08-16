@@ -49,7 +49,7 @@ func (r *raftLogGCTaskHandler) gcRaftLog(raftDb *badger.DB, regionId, startIdx, 
 	}
 
 	if firstIdx >= endIdx {
-		log.Infof("no need to gc, [regionId: %d]", regionId)
+		// log.Infof("no need to gc, [regionId: %d]", regionId)
 		return 0, nil
 	}
 

@@ -16,7 +16,6 @@ package raft
 
 import (
 	"errors"
-	"sync"
 
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
@@ -109,8 +108,6 @@ type Progress struct {
 }
 
 type Raft struct {
-	mu sync.RWMutex
-
 	id uint64
 
 	Term uint64
@@ -175,7 +172,6 @@ func newRaft(c *Config) *Raft {
 	}
 	hardState, confState, _ := c.Storage.InitialState()
 	raft := &Raft{
-		mu:               sync.RWMutex{},
 		id:               c.ID,
 		Term:             hardState.Term,
 		Vote:             hardState.Vote,
@@ -189,7 +185,11 @@ func newRaft(c *Config) *Raft {
 		electionTimeout:  c.ElectionTick,
 		PendingConfIndex: 0,
 	}
-	raft.RaftLog.applied = c.Applied
+	// DPrintf("[%s] New Raft Log %+v", RaftToString(raft), raft.RaftLog)
+
+	if c.Applied > raft.RaftLog.applied {
+		raft.RaftLog.applied = c.Applied
+	}
 
 	// read persist
 	for _, peer := range confState.Nodes {
@@ -204,7 +204,7 @@ func newRaft(c *Config) *Raft {
 }
 
 func (r *Raft) sendNewMsg(msg *pb.Message) {
-	// DPrintf("[%s] Send Msg {%s}", RaftToString(r), MessageToString(*msg))
+	DPrintf("[%s] Send Msg {%s}", RaftToString(r), MessageToString(*msg))
 	r.msgs = append(r.msgs, *msg)
 }
 
@@ -259,14 +259,6 @@ func (r *Raft) Step(m pb.Message) error {
 		r.handleHeartbeatResponse(m)
 	}
 	return nil
-}
-
-// handleSnapshot handle Snapshot RPC request
-func (r *Raft) handleSnapshot(m pb.Message) {
-	// Your Code Here (2C).
-	if m.GetTerm() > r.Term {
-		r.becomeFollower(m.GetTerm(), None)
-	}
 }
 
 // addNode add a new node to raft group

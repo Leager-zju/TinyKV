@@ -90,7 +90,7 @@ func (snapCtx *snapContext) handleGen(regionId uint64, notifier chan<- *eraftpb.
 
 // applySnap applies snapshot data of the Region.
 func (snapCtx *snapContext) applySnap(regionId uint64, startKey, endKey []byte, snapMeta *eraftpb.SnapshotMetadata) error {
-	log.Infof("begin apply snap data. [regionId: %d]", regionId)
+	log.Debugf("begin apply snap data. [regionId: %d]", regionId)
 
 	// cleanUpOriginData clear up the region data before applying snapshot
 	snapCtx.cleanUpRange(regionId, startKey, endKey)
@@ -114,7 +114,7 @@ func (snapCtx *snapContext) applySnap(regionId uint64, startKey, endKey []byte, 
 		return err
 	}
 
-	log.Infof("applying new data. [regionId: %d, timeTakes: %v]", regionId, time.Now().Sub(t))
+	log.Debugf("applying new data. [regionId: %d, timeTakes: %v]", regionId, time.Now().Sub(t))
 	return nil
 }
 
@@ -134,7 +134,7 @@ func (snapCtx *snapContext) cleanUpRange(regionId uint64, startKey, endKey []byt
 		log.Fatalf("failed to delete data in range, [regionId: %d, startKey: %s, endKey: %s, err: %v]", regionId,
 			hex.EncodeToString(startKey), hex.EncodeToString(endKey), err)
 	} else {
-		log.Infof("succeed in deleting data in range. [regionId: %d, startKey: %s, endKey: %s]", regionId,
+		log.Debugf("succeed in deleting data in range. [regionId: %d, startKey: %s, endKey: %s]", regionId,
 			hex.EncodeToString(startKey), hex.EncodeToString(endKey))
 	}
 }
