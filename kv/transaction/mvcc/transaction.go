@@ -1,12 +1,14 @@
 package mvcc
 
 import (
+	"bytes"
 	"encoding/binary"
+
+	"github.com/pingcap-incubator/tinykv/log"
 
 	"github.com/pingcap-incubator/tinykv/kv/storage"
 	"github.com/pingcap-incubator/tinykv/kv/util/codec"
 	"github.com/pingcap-incubator/tinykv/kv/util/engine_util"
-	"github.com/pingcap-incubator/tinykv/log"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 	"github.com/pingcap-incubator/tinykv/scheduler/pkg/tsoutil"
 )
@@ -48,10 +50,10 @@ func (txn *MvccTxn) Writes() []storage.Modify {
 }
 
 // PutWrite records a write at key and ts.
-func (txn *MvccTxn) PutWrite(key []byte, ts uint64, write *Write) {
+func (txn *MvccTxn) PutWrite(key []byte, curTs uint64, write *Write) {
 	txn.writes = append(txn.writes, storage.Modify{
 		Data: storage.Put{
-			Key:   EncodeKey(key, ts),
+			Key:   EncodeKey(key, curTs),
 			Value: write.ToBytes(),
 			Cf:    engine_util.CfWrite,
 		},
@@ -64,7 +66,7 @@ func (txn *MvccTxn) PutWrite(key []byte, ts uint64, write *Write) {
 func (txn *MvccTxn) GetLock(key []byte) (*Lock, error) {
 	value, err := txn.Reader.GetCF(engine_util.CfLock, key)
 	if err != nil {
-		return nil, err
+		log.Panic(err)
 	}
 	if value == nil {
 		return nil, nil
@@ -72,7 +74,10 @@ func (txn *MvccTxn) GetLock(key []byte) (*Lock, error) {
 
 	lock, err := ParseLock(value)
 	if err != nil {
-		return nil, err
+		log.Panic(err)
+	}
+	if lock.Ts != txn.StartTS {
+		lock = nil
 	}
 	return lock, nil
 }
@@ -101,21 +106,20 @@ func (txn *MvccTxn) DeleteLock(key []byte) {
 // GetValue finds the value for key, valid at the start timestamp of this transaction.
 // I.e., the most recent value committed before the start of this transaction.
 func (txn *MvccTxn) GetValue(key []byte) ([]byte, error) {
-	writes := []*Write{}
-	writeIter := txn.Reader.IterCF(engine_util.CfWrite)
-	writeIter.Seek(EncodeKey(key, txn.StartTS))
-	for writeIter.Valid() {
-		value, _ := writeIter.Item().Value()
-		write, _ := ParseWrite(value)
-		writes = append(writes, write)
+	write, err := txn.LastCommitWrite(key)
+	if err != nil {
+		log.Panic(err)
 	}
-	log.Infof("%#v", writes)
+	if write == nil || write.Kind == WriteKindDelete {
+		return nil, nil
+	}
 
-	iter := txn.Reader.IterCF(engine_util.CfDefault)
-	iter.Seek(EncodeKey(key, txn.StartTS))
-	if iter.Valid() {
-		value, _ := iter.Item().Value()
-		log.Infof("UserKey: %v, TimeStamp: %d, Value: %v", DecodeUserKey(iter.Item().Key()), decodeTimestamp(iter.Item().Key()), value)
+	startTS := write.StartTS
+	// log.Infof("%+v", *write)
+	readIter := txn.Reader.IterCF(engine_util.CfDefault)
+	readIter.Seek(EncodeKey(key, startTS))
+	if readIter.Valid() && bytes.Equal(DecodeUserKey(readIter.Item().Key()), key) {
+		return readIter.Item().Value()
 	}
 	return nil, nil
 }
@@ -141,17 +145,89 @@ func (txn *MvccTxn) DeleteValue(key []byte) {
 	})
 }
 
+// LastCommitWrite searches for the latest commit WRITE before the transaction's start timestamp.
+// It returns a Write from the DB, or an error.
+func (txn *MvccTxn) LastCommitWrite(key []byte) (*Write, error) {
+	writeIter := txn.Reader.IterCF(engine_util.CfWrite)
+	writeIter.Seek(EncodeKey(key, txn.StartTS))
+	if !writeIter.Valid() {
+		return nil, nil
+	}
+
+	// {EncodeKey(user key, the commit timestamp), a Write data structure}
+	if !bytes.Equal(DecodeUserKey(writeIter.Item().Key()), key) {
+		return nil, nil
+	}
+
+	value, err := writeIter.Item().Value()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	write, err := ParseWrite(value)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	return write, nil
+}
+
 // CurrentWrite searches for a write with this transaction's start timestamp. It returns a Write from the DB and that
 // write's commit timestamp, or an error.
 func (txn *MvccTxn) CurrentWrite(key []byte) (*Write, uint64, error) {
-	// Your Code Here (4A).
+	writeIter := txn.Reader.IterCF(engine_util.CfWrite) // the latest commited WRITE
+	for writeIter.Valid() {
+		writeKey := writeIter.Item().Key() // {user key, the commit timestamp}
+		value, err := writeIter.Item().Value()
+		if err != nil {
+			log.Panic(err)
+		}
+
+		write, err := ParseWrite(value)
+		userKey, startTS, commitTS := DecodeUserKey(writeKey), write.StartTS, decodeTimestamp(writeKey)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if bytes.Equal(userKey, key) {
+			if startTS < txn.StartTS {
+				return nil, 0, nil
+			}
+
+			if startTS == txn.StartTS {
+				return write, commitTS, nil
+			}
+		}
+		writeIter.Next()
+	}
+
 	return nil, 0, nil
 }
 
 // MostRecentWrite finds the most recent write with the given key. It returns a Write from the DB and that
 // write's commit timestamp, or an error.
 func (txn *MvccTxn) MostRecentWrite(key []byte) (*Write, uint64, error) {
-	// Your Code Here (4A).
+	writeIter := txn.Reader.IterCF(engine_util.CfWrite) // the latest commited WRITE
+	for writeIter.Valid() {
+		writeKey := writeIter.Item().Key() // {user key, the commit timestamp}
+		value, err := writeIter.Item().Value()
+		if err != nil {
+			log.Panic(err)
+		}
+
+		write, err := ParseWrite(value)
+		userKey, commitTS := DecodeUserKey(writeKey), decodeTimestamp(writeKey)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if bytes.Equal(userKey, key) {
+			return write, commitTS, nil
+		}
+
+		writeIter.Next()
+	}
+
 	return nil, 0, nil
 }
 

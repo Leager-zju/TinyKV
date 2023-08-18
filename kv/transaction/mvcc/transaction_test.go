@@ -122,6 +122,7 @@ func TestDeleteValue4A(t *testing.T) {
 	assertDeleteInTxn(t, txn, EncodeKey([]byte{17, 255, 0}, 63454245), engine_util.CfDefault)
 }
 
+// put: 40, 42
 func singleEntry(m *storage.MemStorage) {
 	m.Set(engine_util.CfDefault, EncodeKey([]byte{16, 240}, 40), []byte{1, 2, 3})
 	write := Write{
@@ -155,6 +156,7 @@ func TestGetValueTooEarly4A(t *testing.T) {
 	assert.Equal(t, []byte(nil), value)
 }
 
+// put: 40, 42; put 50, 52
 func twoEntries(m *storage.MemStorage) {
 	m.Set(engine_util.CfDefault, EncodeKey([]byte{16, 240}, 40), []byte{1, 2, 3})
 	write1 := Write{
@@ -187,6 +189,7 @@ func TestGetValueNotOverwritten4A(t *testing.T) {
 	assert.Equal(t, []byte{1, 2, 3}, value)
 }
 
+// put: 40, 42; delete: 50, 52
 func deleted(m *storage.MemStorage) {
 	m.Set(engine_util.CfDefault, EncodeKey([]byte{16, 240}, 40), []byte{1, 2, 3})
 	write1 := Write{

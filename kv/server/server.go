@@ -3,10 +3,13 @@ package server
 import (
 	"context"
 
+	"github.com/pingcap-incubator/tinykv/log"
+
 	"github.com/pingcap-incubator/tinykv/kv/coprocessor"
 	"github.com/pingcap-incubator/tinykv/kv/storage"
 	"github.com/pingcap-incubator/tinykv/kv/storage/raft_storage"
 	"github.com/pingcap-incubator/tinykv/kv/transaction/latches"
+	"github.com/pingcap-incubator/tinykv/kv/transaction/mvcc"
 	coppb "github.com/pingcap-incubator/tinykv/proto/pkg/coprocessor"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/tinykvpb"
@@ -49,38 +52,257 @@ func (server *Server) Snapshot(stream tinykvpb.TinyKv_SnapshotServer) error {
 
 // Transactional API.
 func (server *Server) KvGet(_ context.Context, req *kvrpcpb.GetRequest) (*kvrpcpb.GetResponse, error) {
-	// Your Code Here (4B).
-	return nil, nil
+	response := new(kvrpcpb.GetResponse)
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	txn := mvcc.NewMvccTxn(reader, req.GetVersion())
+
+	// 1. check if locked
+	lock, err := txn.GetLock(req.GetKey())
+	if err != nil {
+		log.Panic(err)
+	}
+	if lock != nil && lock.Ts <= req.GetVersion() {
+		// err1: the key has been locked
+		response.Error = &kvrpcpb.KeyError{
+			Locked: lock.Info(req.GetKey()),
+		}
+		return response, nil
+	}
+
+	// 2. check if value is valid
+	value, err := txn.GetValue(req.GetKey())
+	if err != nil {
+		log.Panic(err)
+	}
+	if value == nil {
+		// err2: the key is not found
+		response.NotFound = true
+	} else {
+		response.Value = value
+	}
+	return response, nil
 }
 
 func (server *Server) KvPrewrite(_ context.Context, req *kvrpcpb.PrewriteRequest) (*kvrpcpb.PrewriteResponse, error) {
-	// Your Code Here (4B).
-	return nil, nil
+	response := new(kvrpcpb.PrewriteResponse)
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+
+	for _, mutation := range req.GetMutations() {
+		// 1. check if locked
+		lock, err := txn.GetLock(mutation.GetKey())
+		if err != nil {
+			log.Panic(err)
+		}
+		if lock != nil && lock.Ts <= req.GetStartVersion() {
+			// err1: the key has been locked
+			response.Errors = append(response.Errors, &kvrpcpb.KeyError{
+				Locked: lock.Info(mutation.GetKey()),
+			})
+			log.Infof("KEY %+v is locked", mutation.GetKey())
+			continue
+		}
+
+		// 2. check if write conflict
+		mostRecentWrite, commitTs, err := txn.MostRecentWrite(mutation.GetKey())
+		if err != nil {
+			log.Panic(err)
+		}
+		if mostRecentWrite != nil && mostRecentWrite.StartTS <= req.GetStartVersion() && commitTs >= req.GetStartVersion() {
+			// err2: conflict with another transaction
+			response.Errors = append(response.Errors, &kvrpcpb.KeyError{
+				Conflict: &kvrpcpb.WriteConflict{
+					StartTs:    mostRecentWrite.StartTS,
+					ConflictTs: req.GetStartVersion(),
+					Key:        mutation.GetKey(),
+					Primary:    req.GetPrimaryLock(),
+				},
+			})
+			log.Infof("the write to KEY %+v is conflict", mutation.GetKey())
+			continue
+		}
+
+		// 3. lock the key
+		txn.PutLock(mutation.GetKey(), &mvcc.Lock{
+			Primary: req.GetPrimaryLock(),
+			Ts:      req.GetStartVersion(),
+			Ttl:     req.GetLockTtl(),
+			Kind:    mvcc.WriteKind(mutation.GetOp() + 1),
+		})
+
+		// 4. collect the mutations
+		switch mutation.Op {
+		case kvrpcpb.Op_Put:
+			txn.PutValue(mutation.GetKey(), mutation.GetValue())
+		case kvrpcpb.Op_Del:
+			txn.DeleteValue(mutation.GetKey())
+		case kvrpcpb.Op_Rollback:
+			{
+				// do nothing
+			}
+		default:
+			log.Panic("Err Undefined Mutation OP")
+		}
+	}
+
+	// Fin. write to the storage
+	server.storage.Write(req.GetContext(), txn.Writes())
+	return response, nil
 }
 
 func (server *Server) KvCommit(_ context.Context, req *kvrpcpb.CommitRequest) (*kvrpcpb.CommitResponse, error) {
-	// Your Code Here (4B).
-	return nil, nil
+	response := new(kvrpcpb.CommitResponse)
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+	for _, key := range req.GetKeys() {
+		write, _, err := txn.CurrentWrite(key)
+		if err != nil {
+			log.Panic(err)
+		}
+		lock, err := txn.GetLock(key)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if write != nil {
+			if write.Kind == mvcc.WriteKindRollback {
+				response.Error = &kvrpcpb.KeyError{
+					Retryable: "Roll Back",
+				}
+				log.Infof("Err Key %+v Commit Roll Back", key)
+			} else {
+				log.Infof("Key %+v Committed Before", key)
+			}
+			break
+		}
+
+		if lock == nil {
+			log.Infof("Err Key %+v Unlocked", key)
+			response.Error = &kvrpcpb.KeyError{
+				Retryable: "Unlocked",
+			}
+			break
+		}
+
+		if lock.Ts != req.GetStartVersion() {
+			log.Infof("Err Key %+v Locked By Another Transaction", key)
+			response.Error = &kvrpcpb.KeyError{
+				Retryable: "Locked By Another Txn",
+			}
+			break
+		}
+
+		txn.DeleteLock(key)
+		txn.PutWrite(key, req.GetCommitVersion(), &mvcc.Write{
+			StartTS: req.GetStartVersion(),
+			Kind:    lock.Kind,
+		})
+	}
+
+	// Fin. write to the storage
+	server.storage.Write(req.GetContext(), txn.Writes())
+	return response, nil
 }
 
 func (server *Server) KvScan(_ context.Context, req *kvrpcpb.ScanRequest) (*kvrpcpb.ScanResponse, error) {
-	// Your Code Here (4C).
-	return nil, nil
+	response := new(kvrpcpb.ScanResponse)
+	// reader, err := server.storage.Reader(req.GetContext())
+	// if err != nil {
+	// 	log.Panic(err)
+	// }
+	// txn := mvcc.NewMvccTxn(reader, req.GetVersion())
+	return response, nil
 }
 
 func (server *Server) KvCheckTxnStatus(_ context.Context, req *kvrpcpb.CheckTxnStatusRequest) (*kvrpcpb.CheckTxnStatusResponse, error) {
-	// Your Code Here (4C).
-	return nil, nil
+	response := new(kvrpcpb.CheckTxnStatusResponse)
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	txn := mvcc.NewMvccTxn(reader, req.GetLockTs())
+
+	// write, _, err := txn.CurrentWrite(req.PrimaryKey)
+	lock, err := txn.GetLock(req.GetPrimaryKey())
+	if err != nil {
+		log.Panic(err)
+	}
+	if lock == nil {
+		response.Action = kvrpcpb.Action_LockNotExistRollback
+	} else if lock.Ts+lock.Ttl < req.GetCurrentTs() {
+		response.Action = kvrpcpb.Action_TTLExpireRollback
+		txn.DeleteValue(req.GetPrimaryKey())
+		txn.DeleteLock(req.GetPrimaryKey())
+		txn.PutWrite(req.GetPrimaryKey(), req.GetLockTs(), &mvcc.Write{
+			StartTS: req.GetLockTs(),
+			Kind:    mvcc.WriteKindRollback,
+		})
+	}
+	log.Infof("%+v", txn.Writes())
+	server.storage.Write(req.GetContext(), txn.Writes())
+	return response, nil
 }
 
 func (server *Server) KvBatchRollback(_ context.Context, req *kvrpcpb.BatchRollbackRequest) (*kvrpcpb.BatchRollbackResponse, error) {
-	// Your Code Here (4C).
-	return nil, nil
+	response := new(kvrpcpb.BatchRollbackResponse)
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+
+	for _, key := range req.GetKeys() {
+		write, _, err := txn.CurrentWrite(key)
+		if err != nil {
+			log.Panic(err)
+		}
+		lock, err := txn.GetLock(key)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if write != nil {
+			if write.Kind == mvcc.WriteKindRollback {
+				// has been rolled back before, no need to PutWrite again
+				continue
+			}
+			response.Error = &kvrpcpb.KeyError{
+				Abort: "Cannot rollback a committed write",
+			}
+			break
+		}
+		if lock != nil {
+			txn.DeleteLock(key)
+			txn.DeleteValue(key)
+		}
+
+		txn.PutWrite(key, req.GetStartVersion(), &mvcc.Write{
+			StartTS: req.GetStartVersion(),
+			Kind:    mvcc.WriteKindRollback,
+		})
+	}
+
+	server.storage.Write(req.GetContext(), txn.Writes())
+	return response, nil
 }
 
 func (server *Server) KvResolveLock(_ context.Context, req *kvrpcpb.ResolveLockRequest) (*kvrpcpb.ResolveLockResponse, error) {
-	// Your Code Here (4C).
-	return nil, nil
+	response := new(kvrpcpb.ResolveLockResponse)
+	// reader, err := server.storage.Reader(req.GetContext())
+	// if err != nil {
+	// 	log.Panic(err)
+	// }
+	// txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+	return response, nil
 }
 
 // SQL push down commands.

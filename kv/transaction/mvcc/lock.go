@@ -62,7 +62,7 @@ func (lock *Lock) IsLockedFor(key []byte, txnStartTs uint64, resp interface{}) b
 	if lock == nil {
 		return false
 	}
-	if txnStartTs == TsMax && bytes.Compare(key, lock.Primary) != 0 {
+	if txnStartTs == TsMax && !bytes.Equal(key, lock.Primary) {
 		return false
 	}
 	if lock.Ts <= txnStartTs {
