@@ -10,6 +10,7 @@ import (
 	"github.com/pingcap-incubator/tinykv/kv/storage/raft_storage"
 	"github.com/pingcap-incubator/tinykv/kv/transaction/latches"
 	"github.com/pingcap-incubator/tinykv/kv/transaction/mvcc"
+	"github.com/pingcap-incubator/tinykv/kv/util/engine_util"
 	coppb "github.com/pingcap-incubator/tinykv/proto/pkg/coprocessor"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/tinykvpb"
@@ -215,29 +216,64 @@ func (server *Server) KvCommit(_ context.Context, req *kvrpcpb.CommitRequest) (*
 
 func (server *Server) KvScan(_ context.Context, req *kvrpcpb.ScanRequest) (*kvrpcpb.ScanResponse, error) {
 	response := new(kvrpcpb.ScanResponse)
-	// reader, err := server.storage.Reader(req.GetContext())
-	// if err != nil {
-	// 	log.Panic(err)
-	// }
-	// txn := mvcc.NewMvccTxn(reader, req.GetVersion())
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+	limit := req.GetLimit()
+	txn := mvcc.NewMvccTxn(reader, req.GetVersion())
+	scanner := mvcc.NewScanner(req.GetStartKey(), txn)
+
+	for limit > 0 {
+		key, value, err := scanner.Next()
+		if err != nil {
+			log.Panic(err)
+		}
+
+		limit--
+		if key == nil || value == nil {
+			break
+		}
+
+		response.Pairs = append(response.Pairs, &kvrpcpb.KvPair{
+			Key:   key,
+			Value: value,
+		})
+	}
+
 	return response, nil
 }
 
 func (server *Server) KvCheckTxnStatus(_ context.Context, req *kvrpcpb.CheckTxnStatusRequest) (*kvrpcpb.CheckTxnStatusResponse, error) {
-	response := new(kvrpcpb.CheckTxnStatusResponse)
+	response := new(kvrpcpb.CheckTxnStatusResponse) // default: NoAction
 	reader, err := server.storage.Reader(req.GetContext())
 	if err != nil {
 		log.Panic(err)
 	}
 	txn := mvcc.NewMvccTxn(reader, req.GetLockTs())
 
-	// write, _, err := txn.CurrentWrite(req.PrimaryKey)
+	write, commitTs, err := txn.CurrentWrite(req.PrimaryKey)
+	if err != nil {
+		log.Panic(err)
+	}
 	lock, err := txn.GetLock(req.GetPrimaryKey())
 	if err != nil {
 		log.Panic(err)
 	}
+
+	if write != nil {
+		if write.Kind != mvcc.WriteKindRollback {
+			response.CommitVersion = commitTs
+		}
+		return response, nil
+	}
+
 	if lock == nil {
 		response.Action = kvrpcpb.Action_LockNotExistRollback
+		txn.PutWrite(req.GetPrimaryKey(), req.GetLockTs(), &mvcc.Write{
+			StartTS: req.GetLockTs(),
+			Kind:    mvcc.WriteKindRollback,
+		})
 	} else if lock.Ts+lock.Ttl < req.GetCurrentTs() {
 		response.Action = kvrpcpb.Action_TTLExpireRollback
 		txn.DeleteValue(req.GetPrimaryKey())
@@ -247,7 +283,7 @@ func (server *Server) KvCheckTxnStatus(_ context.Context, req *kvrpcpb.CheckTxnS
 			Kind:    mvcc.WriteKindRollback,
 		})
 	}
-	log.Infof("%+v", txn.Writes())
+
 	server.storage.Write(req.GetContext(), txn.Writes())
 	return response, nil
 }
@@ -297,11 +333,47 @@ func (server *Server) KvBatchRollback(_ context.Context, req *kvrpcpb.BatchRollb
 
 func (server *Server) KvResolveLock(_ context.Context, req *kvrpcpb.ResolveLockRequest) (*kvrpcpb.ResolveLockResponse, error) {
 	response := new(kvrpcpb.ResolveLockResponse)
-	// reader, err := server.storage.Reader(req.GetContext())
-	// if err != nil {
-	// 	log.Panic(err)
-	// }
-	// txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+	reader, err := server.storage.Reader(req.GetContext())
+	if err != nil {
+		log.Panic(err)
+	}
+
+	commit := req.GetCommitVersion() != 0
+	txn := mvcc.NewMvccTxn(reader, req.GetStartVersion())
+
+	// traverse all locks
+	iter := reader.IterCF(engine_util.CfLock)
+	for iter.Valid() {
+		key := iter.Item().Key()
+		value, err := iter.Item().Value()
+		if err != nil {
+			log.Panic(err)
+		}
+		lock, err := mvcc.ParseLock(value)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if lock.Ts == req.GetStartVersion() { // the same txn
+			if commit {
+				txn.DeleteLock(key)
+				txn.PutWrite(key, req.GetCommitVersion(), &mvcc.Write{
+					StartTS: req.GetStartVersion(),
+					Kind:    lock.Kind,
+				})
+			} else {
+				txn.DeleteValue(key)
+				txn.DeleteLock(key)
+				txn.PutWrite(key, req.GetStartVersion(), &mvcc.Write{
+					StartTS: req.GetStartVersion(),
+					Kind:    mvcc.WriteKindRollback,
+				})
+			}
+		}
+		iter.Next()
+	}
+
+	server.storage.Write(req.GetContext(), txn.Writes())
 	return response, nil
 }
 

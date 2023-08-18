@@ -4,9 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/pingcap-incubator/tinykv/kv/transaction/mvcc"
 	"github.com/pingcap-incubator/tinykv/kv/util/engine_util"
-	"github.com/pingcap-incubator/tinykv/log"
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 	"github.com/stretchr/testify/assert"
 )
@@ -145,9 +143,6 @@ func TestCheckTxnStatusTtlExpired4C(t *testing.T) {
 		{cf: engine_util.CfDefault, key: []byte{3}, ts: cmd.LockTs, value: []byte{42}},
 		{cf: engine_util.CfLock, key: []byte{3}, value: []byte{3, 1, 0, 0, 5, 0, 0, 0, 0, builder.ts(), 0, 0, 0, 0, 0, 0, 0, 8}},
 	})
-	lock, _ := mvcc.ParseLock([]byte{3, 1, 0, 0, 5, 0, 0, 0, 0, builder.ts(), 0, 0, 0, 0, 0, 0, 0, 8})
-	write, _ := mvcc.ParseWrite([]byte{3, 0, 0, 5, 0, 0, 0, 0, builder.ts()})
-	log.Infof("%+v %+v", lock, write)
 	resp := builder.runOneRequest(cmd).(*kvrpcpb.CheckTxnStatusResponse)
 
 	assert.Nil(t, resp.RegionError)
@@ -164,7 +159,7 @@ func TestCheckTxnStatusTtlNotExpired4C(t *testing.T) {
 	cmd := builder.checkTxnStatusRequest([]byte{3})
 	builder.init([]kv{
 		{cf: engine_util.CfDefault, key: []byte{3}, ts: cmd.LockTs, value: []byte{42}},
-		{cf: engine_util.CfLock, key: []byte{3}, value: []byte{3, 1, 0, 0, 5, 0, 0, 0, 0, builder.ts(), 0, 0, 0, 1, 0, 0, 0, 8}},
+		{cf: engine_util.CfLock, key: []byte{3}, value: []byte{3, 1, 0, 0, 5, 0, 0, 0, 0, builder.ts(), 0, 0, 1, 0, 0, 0, 0, 8}},
 	})
 	resp := builder.runOneRequest(cmd).(*kvrpcpb.CheckTxnStatusResponse)
 
