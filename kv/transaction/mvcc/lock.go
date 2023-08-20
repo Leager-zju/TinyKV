@@ -42,6 +42,22 @@ func (lock *Lock) ToBytes() []byte {
 	return buf
 }
 
+func (lock *Lock) IsLockedBy(txn *MvccTxn) bool {
+	return lock != nil && lock.Ts == txn.StartTS
+}
+
+func (lock *Lock) ExistAt(curTs uint64) bool {
+	return lock != nil && curTs >= lock.Ts
+}
+
+func (lock *Lock) IsExpiredAt(curTs uint64) bool {
+	return lock != nil && lock.Ttl > 0 && curTs > lock.Ts+lock.Ttl
+}
+
+func (lock *Lock) IsLockedAt(curTs uint64) bool {
+	return lock.ExistAt(curTs) && !lock.IsExpiredAt(curTs)
+}
+
 // ParseLock attempts to parse a byte string into a Lock object.
 func ParseLock(input []byte) (*Lock, error) {
 	if len(input) <= 16 {
