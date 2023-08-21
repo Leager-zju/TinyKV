@@ -240,7 +240,7 @@ func (r *Raft) Step(m pb.Message) error {
 			r.heartbeatTimeoutEvent()
 		}
 	case pb.MessageType_MsgPropose:
-		if r.State == StateLeader {
+		if r.State == StateLeader && r.leadTransferee == None {
 			r.proposeEntry(m)
 		}
 	case pb.MessageType_MsgAppend:
@@ -257,16 +257,14 @@ func (r *Raft) Step(m pb.Message) error {
 		r.handleHeartbeat(m)
 	case pb.MessageType_MsgHeartbeatResponse:
 		r.handleHeartbeatResponse(m)
+	case pb.MessageType_MsgTransferLeader:
+		if r.State == StateLeader {
+			r.handleTransferLeader(m)
+		}
+	case pb.MessageType_MsgTimeoutNow:
+		if r.State != StateLeader {
+			r.handleTimeoutNow(m)
+		}
 	}
 	return nil
-}
-
-// addNode add a new node to raft group
-func (r *Raft) addNode(id uint64) {
-	// Your Code Here (3A).
-}
-
-// removeNode remove a node from raft group
-func (r *Raft) removeNode(id uint64) {
-	// Your Code Here (3A).
 }

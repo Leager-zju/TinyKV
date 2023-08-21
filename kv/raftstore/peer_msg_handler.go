@@ -58,14 +58,6 @@ func (d *peerMsgHandler) HandleRaftReady() {
 				// 这里不是最后统一写入 badger 是防止出现先 put 再 get，由于最后统一写而 get 不到的情况
 				kvWB := new(engine_util.WriteBatch)
 				d.applyCommittedEntry(&entry, kvWB)
-				// if d.stopped {
-				// 	return
-				// }
-				// // 每次 apply 完更新 appliedIndex
-				// d.peer.peerStorage.applyState.AppliedIndex = entry.GetIndex()
-				// if err := kvWB.SetMeta(meta.ApplyStateKey(d.regionId), d.peer.peerStorage.applyState); err != nil {
-				// 	log.Panic(err)
-				// }
 				kvWB.MustWriteToDB(d.ctx.engine.Kv)
 			}
 		}
@@ -81,65 +73,101 @@ func (d *peerMsgHandler) HandleRaftReady() {
 }
 
 func (d *peerMsgHandler) applyCommittedEntry(entry *eraftpb.Entry, wb *engine_util.WriteBatch) {
-	msg := new(raft_cmdpb.RaftCmdRequest)
-	if err := msg.Unmarshal(entry.Data); err != nil {
-		log.Panic(err)
-	}
-	DPrintf("[%d %d] Try Apply Request{%+v} At {index: %d, term: %d}", d.Region().GetId(), d.storeID(), msg, entry.GetIndex(), entry.GetTerm())
-
-	if len(msg.Requests) > 0 {
-		d.applyRequests(msg, entry, wb)
-	}
-
-	if msg.AdminRequest != nil {
-		d.applyAdminRequest(msg.AdminRequest, entry, wb)
-	}
-}
-
-func (d *peerMsgHandler) applyRequests(msg *raft_cmdpb.RaftCmdRequest, entry *eraftpb.Entry, wb *engine_util.WriteBatch) {
-	response := newCmdResp()
 	isSnap := false
-	for _, req := range msg.Requests {
-		switch req.GetCmdType() {
-		case raft_cmdpb.CmdType_Get:
-			getReq := req.GetGet()
-			cf, key := getReq.GetCf(), getReq.GetKey()
-			value, err := engine_util.GetCF(d.peerStorage.Engines.Kv, cf, key)
-			if err != nil {
-				log.Panic(fmt.Sprintf("[%d %d] Err: %s", d.Region().GetId(), d.storeID(), err))
+	response := newCmdResp()
+
+	if entry.GetEntryType() == eraftpb.EntryType_EntryConfChange {
+		cc := new(eraftpb.ConfChange)
+		if err := cc.Unmarshal(entry.GetData()); err != nil {
+			log.Panic(err)
+		}
+		d.peer.RaftGroup.ApplyConfChange(*cc)
+		response.AdminResponse = &raft_cmdpb.AdminResponse{
+			CmdType: raft_cmdpb.AdminCmdType_ChangePeer,
+			ChangePeer: &raft_cmdpb.ChangePeerResponse{
+				Region: d.Region(),
+			},
+		}
+	} else {
+		msg := new(raft_cmdpb.RaftCmdRequest)
+		if err := msg.Unmarshal(entry.GetData()); err != nil {
+			log.Panic(err)
+		}
+		DPrintf("[%d %d] Try Apply Request{%+v} At {index: %d, term: %d}", d.Region().GetId(), d.storeID(), msg, entry.GetIndex(), entry.GetTerm())
+
+		for _, req := range msg.Requests {
+			switch req.GetCmdType() {
+			case raft_cmdpb.CmdType_Get:
+				getReq := req.GetGet()
+				cf, key := getReq.GetCf(), getReq.GetKey()
+				value, err := engine_util.GetCF(d.peerStorage.Engines.Kv, cf, key)
+				if err != nil {
+					log.Panic(fmt.Sprintf("[%d %d] Err: %s", d.Region().GetId(), d.storeID(), err))
+				}
+				response.Responses = append(response.Responses, &raft_cmdpb.Response{
+					CmdType: raft_cmdpb.CmdType_Get,
+					Get: &raft_cmdpb.GetResponse{
+						Value: value,
+					},
+				})
+			case raft_cmdpb.CmdType_Put:
+				putReq := req.GetPut()
+				cf, key, value := putReq.GetCf(), putReq.GetKey(), putReq.GetValue()
+				wb.SetCF(cf, key, value)
+				response.Responses = append(response.Responses, &raft_cmdpb.Response{
+					CmdType: raft_cmdpb.CmdType_Put,
+					Put:     &raft_cmdpb.PutResponse{},
+				})
+			case raft_cmdpb.CmdType_Delete:
+				deleteReq := req.GetDelete()
+				cf, key := deleteReq.GetCf(), deleteReq.GetKey()
+				wb.DeleteCF(cf, key)
+				response.Responses = append(response.Responses, &raft_cmdpb.Response{
+					CmdType: raft_cmdpb.CmdType_Delete,
+					Delete:  &raft_cmdpb.DeleteResponse{},
+				})
+			case raft_cmdpb.CmdType_Snap:
+				isSnap = true
+				response.Responses = append(response.Responses, &raft_cmdpb.Response{
+					CmdType: raft_cmdpb.CmdType_Snap,
+					Snap: &raft_cmdpb.SnapResponse{
+						Region: d.Region(),
+					},
+				})
+			case raft_cmdpb.CmdType_Invalid:
+				log.Info("Invalid CmdType")
 			}
-			response.Responses = append(response.Responses, &raft_cmdpb.Response{
-				CmdType: raft_cmdpb.CmdType_Get,
-				Get: &raft_cmdpb.GetResponse{
-					Value: value,
-				},
-			})
-		case raft_cmdpb.CmdType_Put:
-			putReq := req.GetPut()
-			cf, key, value := putReq.GetCf(), putReq.GetKey(), putReq.GetValue()
-			wb.SetCF(cf, key, value)
-			response.Responses = append(response.Responses, &raft_cmdpb.Response{
-				CmdType: raft_cmdpb.CmdType_Put,
-				Put:     &raft_cmdpb.PutResponse{},
-			})
-		case raft_cmdpb.CmdType_Delete:
-			deleteReq := req.GetDelete()
-			cf, key := deleteReq.GetCf(), deleteReq.GetKey()
-			wb.DeleteCF(cf, key)
-			response.Responses = append(response.Responses, &raft_cmdpb.Response{
-				CmdType: raft_cmdpb.CmdType_Delete,
-				Delete:  &raft_cmdpb.DeleteResponse{},
-			})
-		case raft_cmdpb.CmdType_Snap:
-			isSnap = true
-			response.Responses = append(response.Responses, &raft_cmdpb.Response{
-				CmdType: raft_cmdpb.CmdType_Snap,
-				Snap: &raft_cmdpb.SnapResponse{
-					Region: d.Region(),
-				},
-			})
-		case raft_cmdpb.CmdType_Invalid:
-			log.Info("Invalid CmdType")
+		}
+
+		if adminReq := msg.GetAdminRequest(); adminReq != nil {
+			adminReq := msg.GetAdminRequest()
+			switch adminReq.CmdType {
+			case raft_cmdpb.AdminCmdType_InvalidAdmin:
+				log.Errorf("Invalid Admin")
+			case raft_cmdpb.AdminCmdType_CompactLog:
+				compactLogIndex := adminReq.GetCompactLog().GetCompactIndex()
+				compactLogTerm := adminReq.GetCompactLog().GetCompactTerm()
+
+				// 1. do the actual log deletion work
+				d.ScheduleCompactLog(compactLogIndex)
+
+				// 2. update applystate
+				if d.peer.peerStorage.applyState.TruncatedState.GetIndex() < compactLogIndex {
+					d.peer.peerStorage.applyState.TruncatedState.Index = compactLogIndex
+					d.peer.peerStorage.applyState.TruncatedState.Term = compactLogTerm
+				}
+				response.AdminResponse = &raft_cmdpb.AdminResponse{
+					CmdType:    raft_cmdpb.AdminCmdType_CompactLog,
+					CompactLog: &raft_cmdpb.CompactLogResponse{},
+				}
+			case raft_cmdpb.AdminCmdType_TransferLeader:
+				d.peer.RaftGroup.TransferLeader(adminReq.GetTransferLeader().GetPeer().GetId())
+				response.AdminResponse = &raft_cmdpb.AdminResponse{
+					CmdType:        raft_cmdpb.AdminCmdType_TransferLeader,
+					TransferLeader: &raft_cmdpb.TransferLeaderResponse{},
+				}
+			case raft_cmdpb.AdminCmdType_Split:
+			}
 		}
 	}
 
@@ -151,7 +179,7 @@ func (d *peerMsgHandler) applyRequests(msg *raft_cmdpb.RaftCmdRequest, entry *er
 						proposal.cb.Txn = d.ctx.engine.Kv.NewTransaction(false)
 					}
 					proposal.cb.Done(response)
-					DPrintf("[%d %d] Done Response Success\n", d.Region().GetId(), d.storeID())
+					DPrintf("[%d %d] Done Response At Index %d Success\n", d.Region().GetId(), d.storeID(), proposal.index)
 				} else {
 					proposal.cb.Done(ErrRespStaleCommand(proposal.term))
 					DPrintf("[%d %d] Done Response ErrRespStaleCommand\n", d.Region().GetId(), d.storeID())
@@ -169,27 +197,6 @@ func (d *peerMsgHandler) applyRequests(msg *raft_cmdpb.RaftCmdRequest, entry *er
 				break
 			}
 		}
-	}
-}
-
-func (d *peerMsgHandler) applyAdminRequest(adminReq *raft_cmdpb.AdminRequest, entry *eraftpb.Entry, wb *engine_util.WriteBatch) {
-	switch adminReq.CmdType {
-	case raft_cmdpb.AdminCmdType_InvalidAdmin:
-	case raft_cmdpb.AdminCmdType_ChangePeer:
-	case raft_cmdpb.AdminCmdType_CompactLog:
-		compactLogIndex := adminReq.CompactLog.GetCompactIndex()
-		compactLogTerm := adminReq.CompactLog.GetCompactTerm()
-
-		// 1. do the actual log deletion work
-		d.ScheduleCompactLog(compactLogIndex)
-
-		// 2. update applystate
-		if d.peer.peerStorage.applyState.TruncatedState.GetIndex() < compactLogIndex {
-			d.peer.peerStorage.applyState.TruncatedState.Index = compactLogIndex
-			d.peer.peerStorage.applyState.TruncatedState.Term = compactLogTerm
-		}
-	case raft_cmdpb.AdminCmdType_TransferLeader:
-	case raft_cmdpb.AdminCmdType_Split:
 	}
 }
 
@@ -261,46 +268,6 @@ func (d *peerMsgHandler) proposeRaftCommand(msg *raft_cmdpb.RaftCmdRequest, cb *
 		return
 	}
 
-	if len(msg.Requests) > 0 {
-		d.proposeRequests(msg, cb)
-	}
-
-	if msg.AdminRequest != nil {
-		d.proposeAdminRequest(msg, cb)
-	}
-
-	d.HandleRaftReady()
-}
-
-func (d *peerMsgHandler) proposeRequests(msg *raft_cmdpb.RaftCmdRequest, cb *message.Callback) {
-	if d.peer.RaftGroup.Raft.State != raft.StateLeader {
-		DPrintf("[%d %d] propose req, but not leader", d.Region().GetId(), d.storeID())
-		cb.Done(ErrResp(&util.ErrNotLeader{
-			RegionId: d.regionId,
-		}))
-		return
-	}
-	// propose to raft
-	data, err := msg.Marshal()
-	if err != nil {
-		cb.Done(ErrResp(err))
-		return
-	} else if err = d.peer.RaftGroup.Propose(data); err != nil {
-		cb.Done(ErrResp(err))
-		return
-	}
-
-	newProposal := &proposal{
-		index: d.peer.RaftGroup.Raft.RaftLog.LastIndex(),
-		term:  d.peer.RaftGroup.Raft.RaftLog.LastTerm(),
-		cb:    cb,
-	}
-	DPrintf("[%d %d] New Request {%+v} and New Proposal %+v", d.Region().GetId(), d.storeID(), msg, newProposal)
-
-	d.peer.proposals = append(d.peer.proposals, newProposal)
-}
-
-func (d *peerMsgHandler) proposeAdminRequest(msg *raft_cmdpb.RaftCmdRequest, cb *message.Callback) {
 	if d.peer.RaftGroup.Raft.State != raft.StateLeader {
 		DPrintf("[%d %d] propose admin req, but not leader", d.Region().GetId(), d.storeID())
 		cb.Done(ErrResp(&util.ErrNotLeader{
@@ -309,15 +276,33 @@ func (d *peerMsgHandler) proposeAdminRequest(msg *raft_cmdpb.RaftCmdRequest, cb 
 		return
 	}
 
-	data, err := msg.Marshal()
-	if err != nil {
-		cb.Done(ErrResp(err))
-		return
-	} else if err = d.peer.RaftGroup.Propose(data); err != nil {
-		cb.Done(ErrResp(err))
-		return
+	if adminReq := msg.GetAdminRequest(); adminReq != nil && adminReq.GetCmdType() == raft_cmdpb.AdminCmdType_ChangePeer {
+		if d.peer.RaftGroup.Raft.PendingConfIndex <= d.peer.RaftGroup.Raft.RaftLog.Applied() {
+			d.peer.RaftGroup.ProposeConfChange(eraftpb.ConfChange{
+				ChangeType: adminReq.GetChangePeer().GetChangeType(),
+				NodeId:     adminReq.GetChangePeer().GetPeer().GetId(),
+			})
+		}
+	} else {
+		data, err := msg.Marshal()
+		if err != nil {
+			cb.Done(ErrResp(err))
+			return
+		} else if err = d.peer.RaftGroup.Propose(data); err != nil {
+			cb.Done(ErrResp(err))
+			return
+		}
 	}
-	DPrintf("[%d %d] New AdminRequest {%+v}", d.Region().GetId(), d.storeID(), msg)
+
+	newProposal := &proposal{
+		index: d.peer.RaftGroup.Raft.RaftLog.LastIndex(),
+		term:  d.peer.RaftGroup.Raft.RaftLog.LastTerm(),
+		cb:    cb,
+	}
+	d.peer.proposals = append(d.peer.proposals, newProposal)
+	DPrintf("[%d %d] New Request {%+v} and New Proposal %+v", d.Region().GetId(), d.storeID(), msg, newProposal)
+
+	d.HandleRaftReady()
 }
 
 func (d *peerMsgHandler) onTick() {

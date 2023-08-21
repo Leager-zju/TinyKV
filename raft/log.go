@@ -162,6 +162,11 @@ func (l *RaftLog) LastIndex() uint64 {
 	return l.LastAppend().GetIndex()
 }
 
+// Applied return the last index of the applied log entries
+func (l *RaftLog) Applied() uint64 {
+	return l.applied
+}
+
 // Term return the term of the entry in the given index
 func (l *RaftLog) Term(i uint64) (result uint64, err error) {
 	if i > l.LastIndex() || i < l.TruncatedIndex() {

@@ -43,6 +43,10 @@ func MessageToString(m pb.Message) string {
 		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, Committed: %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetCommit())
 	case pb.MessageType_MsgHeartbeatResponse:
 		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, ConflictLogIndex: %d, Reject: %t}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetIndex(), m.GetReject())
+	case pb.MessageType_MsgTransferLeader:
+		return fmt.Sprintf("{Type: %s, Transferee: %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetFrom())
+	case pb.MessageType_MsgTimeoutNow:
+		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo())
 	}
 	return ""
 }
@@ -105,6 +109,7 @@ func (r *Raft) updateCommitted() {
 // becomeFollower transform this peer's state to Follower
 func (r *Raft) becomeFollower(term uint64, lead uint64) {
 	r.Term, r.State, r.Lead = term, StateFollower, lead
+	r.leadTransferee = None
 	r.clearVote()
 }
 

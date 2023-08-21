@@ -214,7 +214,7 @@ func (txn *MvccTxn) CurrentWrite(key []byte) (*Write, uint64, error) {
 func (txn *MvccTxn) MostRecentWrite(key []byte) (*Write, uint64, error) {
 	writeIter := txn.Reader.IterCF(engine_util.CfWrite)
 	defer writeIter.Close()
-	
+
 	for writeIter.Valid() {
 		encoded_key := writeIter.Item().Key() // {user key, the commit timestamp}
 		writeInByte, err := writeIter.Item().Value()

@@ -1,8 +1,8 @@
 package raft
 
 import (
+	"github.com/pingcap-incubator/tinykv/log"
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
-	"github.com/pingcap-incubator/tinykv/proto/pkg/raft_cmdpb"
 )
 
 func (r *Raft) startAppend() {
@@ -105,7 +105,7 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	response.Index = lastNewLogIndex
 
 	r.Lead = m.GetFrom()
-	r.clearVote()	
+	r.clearVote()
 	r.resetElectionElapsed()
 }
 
@@ -124,6 +124,11 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message) {
 			r.Prs[m.GetFrom()].Match = m.GetIndex()
 			r.Prs[m.GetFrom()].Next = m.GetIndex() + 1
 			r.updateCommitted()
+
+			if m.GetFrom() == r.leadTransferee && r.Prs[m.GetFrom()].Next == r.RaftLog.LastIndex()+1 {
+				r.sendTimeout(m.GetFrom())
+				return
+			}
 		}
 	}
 }
@@ -215,9 +220,11 @@ func (r *Raft) proposeEntry(m pb.Message) {
 			Index:     r.RaftLog.LastIndex() + 1,
 			Data:      entry.GetData(),
 		}
-		msg := new(raft_cmdpb.RaftCmdRequest)
-		msg.Unmarshal(newEntry.Data)
-		DPrintf("[%s] Propose Msg {%+v} at index %d, term %d", RaftToString(r), msg, newEntry.GetIndex(), newEntry.GetTerm())
+		log.Infof("[%s] Propose %+v", RaftToString(r), newEntry)
+
+		if entry.GetEntryType() == pb.EntryType_EntryConfChange {
+			r.PendingConfIndex = newEntry.GetIndex()
+		}
 		r.RaftLog.appendEntry(newEntry)
 	}
 
