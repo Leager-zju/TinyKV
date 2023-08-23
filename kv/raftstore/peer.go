@@ -228,7 +228,7 @@ func (p *peer) Destroy(engine *engine_util.Engines, keepData bool) error {
 	}
 	p.proposals = nil
 
-	DPrintf("%v destroy itself, takes %v", p.Tag, time.Now().Sub(start))
+	DPrintf("%v destroy itself, takes %v", p.Tag, time.Since(start))
 	return nil
 }
 

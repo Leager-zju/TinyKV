@@ -9,7 +9,7 @@ import (
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
-const DEBUG bool = false
+const DEBUG bool = true
 
 func DPrintf(format string, a ...interface{}) {
 	if DEBUG {
@@ -92,8 +92,8 @@ func (r *Raft) updateCommitted() {
 		}
 
 		cnt := 0
-		for peer := range r.Prs {
-			if r.Prs[peer].Match >= N {
+		for _, pr := range r.Prs {
+			if pr.Match >= N {
 				cnt++
 			}
 		}
@@ -122,6 +122,7 @@ func (r *Raft) becomeCandidate() {
 	//  • Send RequestVote RPCs to all other servers
 	r.State = StateCandidate
 	r.Term++
+	r.Lead = r.id
 	r.Vote = r.id
 	r.voteCnt = 1
 	r.votes[r.id] = true

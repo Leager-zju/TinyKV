@@ -12,7 +12,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"runtime"
 	"strings"
 )
 
@@ -54,8 +53,10 @@ const FORMAT_TIME_HOUR string = "2006010215"
 var _log *Logger = New()
 
 func init() {
-	SetFlags(Ldate | Ltime | Lshortfile)
-	SetHighlighting(runtime.GOOS != "windows")
+	// SetFlags(Ldate | Ltime | Lshortfile)
+	// SetHighlighting(runtime.GOOS != "windows")
+	SetFlags(Lshortfile)
+	SetHighlighting(false)
 }
 
 func GlobalLogger() *log.Logger {

@@ -383,17 +383,21 @@ func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_ut
 // Do not modify ready in this function, this is a requirement to advance the ready object properly later.
 func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, error) {
 	hardState, unstabledEntries, committedEntries := ready.HardState, ready.Entries, ready.CommittedEntries
+	var result *ApplySnapResult = nil
+	var err error
 	kvWB := new(engine_util.WriteBatch)
 	raftWB := new(engine_util.WriteBatch)
-	result := &ApplySnapResult{}
 
 	if !raft.IsEmptySnap(&ready.Snapshot) {
-		result, _ = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
+		result, err = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
+		if err != nil {
+			log.Panic(err)
+		}
 	}
 
 	if n := len(committedEntries); n > 0 {
 		ps.applyState.AppliedIndex = committedEntries[n-1].GetIndex()
-		if err := kvWB.SetMeta(meta.ApplyStateKey(ps.Region().GetId()), ps.applyState); err != nil {
+		if err = kvWB.SetMeta(meta.ApplyStateKey(ps.Region().GetId()), ps.applyState); err != nil {
 			log.Panic(err)
 		}
 	}
@@ -405,12 +409,12 @@ func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, erro
 	}
 	if n := len(unstabledEntries); n > 0 { // save raft log
 		hasUpdate = true
-		if err := ps.Append(unstabledEntries, raftWB); err != nil {
+		if err = ps.Append(unstabledEntries, raftWB); err != nil {
 			log.Panic(err)
 		}
 	}
 	if hasUpdate { // save RaftLocalState: Used to store HardState of the current Raft and the last Log Index.
-		if err := raftWB.SetMeta(meta.RaftStateKey(ps.Region().GetId()), ps.raftState); err != nil {
+		if err = raftWB.SetMeta(meta.RaftStateKey(ps.Region().GetId()), ps.raftState); err != nil {
 			log.Panic(err)
 		}
 	}

@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"github.com/pingcap-incubator/tinykv/log"
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
@@ -126,6 +125,7 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message) {
 			r.updateCommitted()
 
 			if m.GetFrom() == r.leadTransferee && r.Prs[m.GetFrom()].Next == r.RaftLog.LastIndex()+1 {
+				r.becomeFollower(r.Term, m.GetFrom())
 				r.sendTimeout(m.GetFrom())
 				return
 			}
@@ -152,6 +152,10 @@ func (r *Raft) sendHeartbeat(to uint64) {
 		From:    r.id,
 		Term:    r.Term,
 		Commit:  r.RaftLog.committed,
+	}
+
+	if pr := r.Prs[to]; pr.Match == 0 {
+		msg.Commit = 0
 	}
 	r.sendNewMsg(msg)
 }
@@ -220,7 +224,7 @@ func (r *Raft) proposeEntry(m pb.Message) {
 			Index:     r.RaftLog.LastIndex() + 1,
 			Data:      entry.GetData(),
 		}
-		log.Infof("[%s] Propose %+v", RaftToString(r), newEntry)
+		DPrintf("[%s] Propose %+v", RaftToString(r), newEntry)
 
 		if entry.GetEntryType() == pb.EntryType_EntryConfChange {
 			r.PendingConfIndex = newEntry.GetIndex()
@@ -234,7 +238,7 @@ func (r *Raft) proposeEntry(m pb.Message) {
 	}
 
 	if len(r.Prs) <= 1 {
-		r.updateCommitted()
+		r.RaftLog.committed = r.RaftLog.LastIndex()
 	} else {
 		r.startAppend()
 	}

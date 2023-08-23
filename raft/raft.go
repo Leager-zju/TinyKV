@@ -191,6 +191,14 @@ func newRaft(c *Config) *Raft {
 		raft.RaftLog.applied = c.Applied
 	}
 
+	for _, peer := range c.peers {
+		raft.Prs[peer] = &Progress{
+			Match: raft.RaftLog.TruncatedIndex(),
+			Next:  raft.RaftLog.LastIndex() + 1,
+		}
+		raft.votes[peer] = false
+	}
+
 	// read persist
 	for _, peer := range confState.Nodes {
 		raft.Prs[peer] = &Progress{
@@ -258,9 +266,7 @@ func (r *Raft) Step(m pb.Message) error {
 	case pb.MessageType_MsgHeartbeatResponse:
 		r.handleHeartbeatResponse(m)
 	case pb.MessageType_MsgTransferLeader:
-		if r.State == StateLeader {
-			r.handleTransferLeader(m)
-		}
+		r.handleTransferLeader(m)
 	case pb.MessageType_MsgTimeoutNow:
 		if r.State != StateLeader {
 			r.handleTimeoutNow(m)
