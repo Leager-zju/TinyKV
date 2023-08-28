@@ -17,6 +17,7 @@ package raft
 import (
 	"errors"
 
+	"github.com/pingcap-incubator/tinykv/log"
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
@@ -170,12 +171,16 @@ func newRaft(c *Config) *Raft {
 	if err := c.validate(); err != nil {
 		panic(err.Error())
 	}
-	hardState, confState, _ := c.Storage.InitialState()
+	hardState, confState, err := c.Storage.InitialState()
+	if err != nil {
+		log.Panic(err)
+	}
+	raftLog := newLog(c.Storage)
 	raft := &Raft{
 		id:               c.ID,
 		Term:             hardState.Term,
 		Vote:             hardState.Vote,
-		RaftLog:          newLog(c.Storage),
+		RaftLog:          raftLog,
 		Prs:              make(map[uint64]*Progress, len(confState.Nodes)),
 		State:            StateFollower,
 		votes:            make(map[uint64]bool, len(confState.Nodes)),
@@ -185,7 +190,7 @@ func newRaft(c *Config) *Raft {
 		electionTimeout:  c.ElectionTick,
 		PendingConfIndex: 0,
 	}
-	// DPrintf("[%s] New Raft Log %+v", RaftToString(raft), raft.RaftLog)
+	DPrintf("[%s] New Raft with conf %+v, log %+v", RaftToString(raft), confState, raftLog)
 
 	if c.Applied > raft.RaftLog.applied {
 		raft.RaftLog.applied = c.Applied
@@ -235,6 +240,9 @@ func (r *Raft) tick() {
 // on `eraftpb.proto` for what msgs should be handled
 func (r *Raft) Step(m pb.Message) error {
 	DPrintf("[%s] Step {%s}", RaftToString(r), MessageToString(m))
+	if _, ok := r.Prs[r.id]; !ok && m.MsgType != pb.MessageType_MsgHeartbeat && m.MsgType != pb.MessageType_MsgSnapshot {
+		return nil
+	}
 	switch m.MsgType {
 	case pb.MessageType_MsgHup:
 		if r.State != StateLeader {

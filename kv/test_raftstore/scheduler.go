@@ -383,6 +383,8 @@ func (m *MockSchedulerClient) handleHeartbeatConfVersion(region *metapb.Region) 
 		// update the region.
 		if m.regionsRange.ReplaceOrInsert(&regionItem{region: *region}) == nil {
 			panic("update inexistent region ")
+		} else {
+			log.Infof("[%d] Insert %+v", m.baseID, region)
 		}
 	} else {
 		MustSamePeers(searchRegion, region)

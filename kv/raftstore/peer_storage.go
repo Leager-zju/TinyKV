@@ -52,7 +52,7 @@ type PeerStorage struct {
 
 // NewPeerStorage get the persist raftState from engines and return a peer storage
 func NewPeerStorage(engines *engine_util.Engines, region *metapb.Region, regionSched chan<- worker.Task, tag string) (*PeerStorage, error) {
-	log.Debugf("%s creating storage for %s", tag, region.String())
+	log.Infof("%s creating storage for %s", tag, region.String())
 	raftState, err := meta.InitRaftLocalState(engines.Raft, region)
 	if err != nil {
 		return nil, err
@@ -307,17 +307,17 @@ func ClearMeta(engines *engine_util.Engines, kvWB, raftWB *engine_util.WriteBatc
 // Append the given entries to the raft log and update ps.raftState also delete log entries that will
 // never be committed
 func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.WriteBatch) error {
-	for _, entry := range entries {
-		if err := raftWB.SetMeta(meta.RaftLogKey(ps.Region().GetId(), entry.GetIndex()), &entry); err != nil {
-			log.Panic(err)
-		}
-	}
 	// delete conflict entries
 	curLastIndex := entries[len(entries)-1].GetIndex()
 	curLastTerm := entries[len(entries)-1].GetIndex()
 	prevLastIndex := ps.raftState.GetLastIndex()
 	for Index := curLastIndex + 1; Index <= prevLastIndex; Index++ {
 		raftWB.DeleteMeta(meta.RaftLogKey(ps.Region().GetId(), Index))
+	}
+	for _, entry := range entries {
+		if err := raftWB.SetMeta(meta.RaftLogKey(ps.Region().GetId(), entry.GetIndex()), &entry); err != nil {
+			log.Panic(err)
+		}
 	}
 	ps.raftState.LastIndex = curLastIndex
 	ps.raftState.LastTerm = curLastTerm

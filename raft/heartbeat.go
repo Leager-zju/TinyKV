@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"github.com/pingcap-incubator/tinykv/log"
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
@@ -65,8 +66,16 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	}
 
 	prevLogIndex, prevLogTerm := m.GetIndex(), m.GetLogTerm()
-	term, _ := r.RaftLog.Term(prevLogIndex)
-	if prevLogIndex > r.RaftLog.LastIndex() || (term != prevLogTerm && prevLogIndex != 0) { // Err Log Doesn't Match
+	if prevLogIndex > r.RaftLog.LastIndex() {
+		response.Reject = true
+		return
+	}
+
+	term, err := r.RaftLog.Term(prevLogIndex)
+	if err != nil {
+		log.Panic(err)
+	}
+	if term != prevLogTerm && prevLogIndex != 0 { // Err Log Doesn't Match
 		response.Reject = true
 		return
 	}
@@ -79,7 +88,10 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 		// follow it
 		newLogIndex := baseNewLogIndex
 		for ; newLogIndex <= min(r.RaftLog.LastIndex(), lastNewLogIndex); newLogIndex++ {
-			newLogTerm, _ := r.RaftLog.Term(newLogIndex)
+			newLogTerm, err := r.RaftLog.Term(newLogIndex)
+			if err != nil {
+				log.Panic(err)
+			}
 			if newLogTerm != m.Entries[newLogIndex-baseNewLogIndex].GetTerm() {
 				r.RaftLog.entries = r.RaftLog.entries[:r.RaftLog.Index2idx(newLogIndex)]
 				r.RaftLog.stabled = min(r.RaftLog.stabled, newLogIndex-1)
@@ -189,7 +201,11 @@ func (r *Raft) handleHeartbeat(m pb.Message) {
 
 	if m.GetCommit() > r.RaftLog.committed {
 		committed := min(m.GetCommit(), r.RaftLog.LastIndex())
-		if term, _ := r.RaftLog.Term(committed); term == r.Term {
+		term, err := r.RaftLog.Term(committed)
+		if err != nil {
+			log.Panic(err)
+		}
+		if term == r.Term {
 			r.RaftLog.committed = committed
 		}
 	}

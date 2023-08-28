@@ -17,6 +17,7 @@ func (r *Raft) sendSnapshot(to uint64) {
 		Term:     r.Term,
 		Snapshot: &newSnapshot,
 	}
+	r.Prs[to].Next = request.GetSnapshot().GetMetadata().GetIndex() + 1
 	r.sendNewMsg(request)
 }
 

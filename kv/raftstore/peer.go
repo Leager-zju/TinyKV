@@ -38,7 +38,7 @@ func createPeer(storeID uint64, cfg *config.Config, sched chan<- worker.Task,
 	if metaPeer == nil {
 		return nil, errors.Errorf("find no peer for store %d in region %v", storeID, region)
 	}
-	DPrintf("region %v create peer with ID %d", region, metaPeer.Id)
+	DPrintf("[region %v] create peer with ID %d", region, metaPeer.Id)
 	return NewPeer(storeID, cfg, engines, region, sched, metaPeer)
 }
 

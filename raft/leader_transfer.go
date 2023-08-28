@@ -40,10 +40,6 @@ func (r *Raft) sendTimeout(to uint64) {
 }
 
 func (r *Raft) handleTimeoutNow(m pb.Message) {
-	if _, ok := r.Prs[r.id]; !ok {
-		return
-	}
-
 	if m.GetTerm() < r.Term { // Err Old Term
 		return
 	}

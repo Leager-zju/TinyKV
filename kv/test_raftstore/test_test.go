@@ -193,7 +193,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		clnts[i] = make(chan int, 1)
 	}
 	for i := 0; i < 3; i++ {
-		// log.Printf("Iteration %v\n", i)
+		log.Infof("##### Iteration %v #####\n", i)
 		atomic.StoreInt32(&done_clients, 0)
 		atomic.StoreInt32(&done_partitioner, 0)
 		go SpawnClientsAndWait(t, ch_clients, nclients, func(cli int, t *testing.T) {
@@ -206,14 +206,14 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 				if (rand.Int() % 1000) < 500 {
 					key := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", j)
 					value := "x " + strconv.Itoa(cli) + " " + strconv.Itoa(j) + " y"
-					// log.Infof("%d: client new put %v,%v", cli, key, value)
+					log.Infof("%d: client new put %v,%v", cli, key, value)
 					cluster.MustPut([]byte(key), []byte(value))
 					last = NextValue(last, value)
 					j++
 				} else {
 					start := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", 0)
 					end := strconv.Itoa(cli) + " " + fmt.Sprintf("%08d", j)
-					// log.Infof("%d: client new scan %v-%v", cli, start, end)
+					log.Infof("%d: client new scan %v-%v", cli, start, end)
 					values := cluster.Scan([]byte(start), []byte(end))
 					v := string(bytes.Join(values, []byte("")))
 					if v != last {
@@ -249,7 +249,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			time.Sleep(electionTimeout)
 		}
 
-		// log.Infof("wait for clients\n")
+		log.Infof("##### wait for clients #####\n")
 		<-ch_clients
 
 		if crash {
@@ -268,7 +268,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		}
 
 		for cli := 0; cli < nclients; cli++ {
-			// log.Infof("read from clients %d\n", cli)
+			log.Infof("##### read from clients %d #####\n", cli)
 			j := <-clnts[cli]
 
 			// if j < 10 {

@@ -84,10 +84,11 @@ func (r *Raft) updateCommitted() {
 	var N uint64 = r.RaftLog.TruncatedIndex()
 	for peer := range r.Prs {
 		N = max(N, r.Prs[peer].Match)
+		// DPrintf("%d %d", r.Prs[peer].Match, N)
 	}
 
 	for ; N > r.RaftLog.committed; N-- {
-		if r.RaftLog.entries[r.RaftLog.Index2idx(N)].GetTerm() != r.Term {
+		if r.RaftLog.At(N).GetTerm() != r.Term {
 			continue
 		}
 

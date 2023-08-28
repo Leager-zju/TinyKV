@@ -17,6 +17,8 @@ package raft
 import (
 	"fmt"
 
+	"github.com/pingcap-incubator/tinykv/log"
+
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
@@ -57,12 +59,32 @@ type RaftLog struct {
 // newLog returns log using the given storage. It recovers the log
 // to the state that it just commits and applies the latest snapshot.
 func newLog(storage Storage) *RaftLog {
-	hardState, _, _ := storage.InitialState()
-	firstIndex, _ := storage.FirstIndex() // truncatedIndex + 1
+	hardState, _, err := storage.InitialState()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	firstIndex, err := storage.FirstIndex() // truncatedIndex + 1
+	if err != nil {
+		log.Panic(err)
+	}
+
 	truncatedIndex := firstIndex - 1
-	truncatedTerm, _ := storage.Term(truncatedIndex)
-	lastIndex, _ := storage.LastIndex()
-	entries, _ := storage.Entries(firstIndex, lastIndex+1)
+	truncatedTerm, err := storage.Term(truncatedIndex)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	lastIndex, err := storage.LastIndex()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	entries, err := storage.Entries(firstIndex, lastIndex+1)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	newLog := &RaftLog{
 		storage:         storage,
 		committed:       hardState.Commit,
@@ -76,6 +98,10 @@ func newLog(storage Storage) *RaftLog {
 
 func (l *RaftLog) length() uint64 {
 	return uint64(len(l.entries))
+}
+
+func (l *RaftLog) At(Index uint64) *pb.Entry {
+	return &l.entries[l.Index2idx(Index)]
 }
 
 func (l *RaftLog) Index2idx(Index uint64) uint64 {
@@ -100,9 +126,15 @@ func (l *RaftLog) appendEntry(e pb.Entry) {
 // storage compact stabled log entries prevent the log entries
 // grow unlimitedly in memory
 func (l *RaftLog) maybeCompact() {
-	firstIndex, _ := l.storage.FirstIndex() // change at every CompactLogRequest
+	firstIndex, err := l.storage.FirstIndex() // change at every CompactLogRequest
+	if err != nil {
+		log.Panic(err)
+	}
 	truncatedIndex := firstIndex - 1
-	truncatedTerm, _ := l.storage.Term(truncatedIndex)
+	truncatedTerm, err := l.storage.Term(truncatedIndex)
+	if err != nil {
+		log.Panic(err)
+	}
 
 	if l.TruncatedIndex() < truncatedIndex {
 		if truncatedIndex <= l.LastAppend().GetIndex() {
