@@ -41,16 +41,16 @@ func newPeerMsgHandler(peer *peer, ctx *GlobalContext) *peerMsgHandler {
 	}
 }
 
-// func (d *peerMsgHandler) check() {
-// 	d.ctx.storeMeta.RLock()
-// 	defer d.ctx.storeMeta.RUnlock()
-// 	result, ok := d.ctx.storeMeta.regionRanges.Get(&regionItem{region: d.Region()}).(*regionItem)
-// 	if ok {
-// 		DPrintf("%s result : %+v", d.Tag, result)
-// 	} else {
-// 		DPrintf("%s find region ERROR!", d.Tag)
-// 	}
-// }
+func (d *peerMsgHandler) check() {
+	d.ctx.storeMeta.RLock()
+	defer d.ctx.storeMeta.RUnlock()
+	result, ok := d.ctx.storeMeta.regionRanges.Get(&regionItem{region: d.Region()}).(*regionItem)
+	if ok {
+		DPrintf("%s result : %+v", d.Tag, result)
+	} else {
+		DPrintf("%s find region ERROR!", d.Tag)
+	}
+}
 
 func (d *peerMsgHandler) updateStoreMeta(peer *peer, prev, cur *metapb.Region) {
 	Meta := d.ctx.storeMeta
@@ -107,7 +107,7 @@ func (d *peerMsgHandler) HandleRaftReady() {
 
 		// 4. tell raft module to advance
 		d.RaftGroup.Advance(ready)
-		// d.check()
+		d.check()
 	}
 }
 
@@ -164,9 +164,6 @@ func (d *peerMsgHandler) applyConfChange(entry *eraftpb.Entry, wb *engine_util.W
 			for i, peer := range newRegion.GetPeers() {
 				if peer.GetId() == cc.GetNodeId() {
 					if d.PeerId() == cc.GetNodeId() {
-						if len(newRegion.GetPeers()) == 2 {
-							d.RaftGroup.TransferLeader(newRegion.Peers[1-i].GetId())
-						}
 						d.destroyPeer()
 						return
 					}
@@ -353,7 +350,7 @@ func (d *peerMsgHandler) applyAdminCommand(msg *raft_cmdpb.RaftCmdRequest, entry
 		d.ctx.router.register(newPeer)
 		d.ctx.router.send(split.GetNewRegionId(), message.Msg{Type: message.MsgTypeStart, RegionID: split.GetNewRegionId()})
 		d.updateStoreMeta(newPeer, nil, newRegion2)
-		// d.check()
+		d.check()
 
 		if d.IsLeader() {
 			d.SendResponse(response, entry.GetIndex(), entry.GetTerm(), false)
@@ -518,6 +515,16 @@ func (d *peerMsgHandler) proposeAdminCommand(msg *raft_cmdpb.RaftCmdRequest, cb 
 		if d.RaftGroup.Raft.PendingConfIndex > d.RaftGroup.Raft.RaftLog.Applied() {
 			return
 		}
+		// remove a leader of a 2-peers-group, do transfer leader first
+		if req.GetChangePeer().GetChangeType() == eraftpb.ConfChangeType_RemoveNode && req.GetChangePeer().GetPeer().GetId() == d.PeerId() {
+			if len(d.Region().GetPeers()) == 2 {
+				if d.Region().Peers[0].GetId() == d.PeerId() {
+					d.RaftGroup.TransferLeader(d.Region().Peers[1].GetId())
+				} else {
+					d.RaftGroup.TransferLeader(d.Region().Peers[0].GetId())
+				}
+			}
+		}
 		newConfChange := eraftpb.ConfChange{
 			ChangeType: req.GetChangePeer().GetChangeType(),
 			NodeId:     req.GetChangePeer().GetPeer().GetId(),
@@ -525,7 +532,6 @@ func (d *peerMsgHandler) proposeAdminCommand(msg *raft_cmdpb.RaftCmdRequest, cb 
 		newConfChange.Context, _ = msg.Marshal()
 
 		d.RaftGroup.ProposeConfChange(newConfChange)
-
 	case raft_cmdpb.AdminCmdType_CompactLog:
 		data, err := msg.Marshal()
 		if err != nil {
@@ -588,12 +594,12 @@ func (d *peerMsgHandler) startTicker() {
 	d.ticker.schedule(PeerTickSplitRegionCheck)
 	d.ticker.schedule(PeerTickSchedulerHeartbeat)
 
-	// go func() {
-	// 	for {
-	// 		d.check()
-	// 		time.Sleep(100 * time.Millisecond)
-	// 	}
-	// }()
+	go func() {
+		for {
+			d.check()
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 }
 
 func (d *peerMsgHandler) onRaftBaseTick() {

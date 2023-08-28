@@ -326,7 +326,7 @@ func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.Write
 
 // Apply the peer with given snapshot
 func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_util.WriteBatch, raftWB *engine_util.WriteBatch) (*ApplySnapResult, error) {
-	DPrintf("%v begin to apply snapshot", ps.Tag)
+	DPrintf("%s begin to apply snapshot", ps.Tag)
 	snapData := new(rspb.RaftSnapshotData)
 	if err := snapData.Unmarshal(snapshot.Data); err != nil {
 		return nil, err

@@ -21,6 +21,7 @@ func (r *Raft) sendAppend(to uint64) bool {
 	nextIndex := r.Prs[to].Next
 	prevIndex := nextIndex - 1
 
+	DPrintf("[%s] Find %d %d %d", RaftToString(r), to, nextIndex, r.RaftLog.TruncatedIndex())
 	if nextIndex <= r.RaftLog.TruncatedIndex() {
 		r.sendSnapshot(to)
 		return true
@@ -65,9 +66,22 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 		response.Term = r.Term
 	}
 
+	// If a follower does not have prevLogIndex in its log,
+	// it should return with conflictIndex = len(log) and conflictTerm = None.
 	prevLogIndex, prevLogTerm := m.GetIndex(), m.GetLogTerm()
 	if prevLogIndex > r.RaftLog.LastIndex() {
 		response.Reject = true
+		response.LogTerm = 0
+		response.Index = r.RaftLog.LastIndex() + 1
+		return
+	}
+
+	if prevLogIndex < r.RaftLog.TruncatedIndex() {
+		response.Reject = true
+		// response.LogTerm = r.RaftLog.TruncatedTerm()
+		// response.Index = r.RaftLog.TruncatedIndex()
+		response.LogTerm = 0
+		response.Index = r.RaftLog.LastIndex() + 1
 		return
 	}
 
@@ -75,8 +89,13 @@ func (r *Raft) handleAppendEntries(m pb.Message) {
 	if err != nil {
 		log.Panic(err)
 	}
+	// If a follower does have prevLogIndex in its log, but the term does not match,
+	// it should return conflictTerm = log[prevLogIndex].Term,
+	// and then search its log for the first index whose entry has term equal to conflictTerm.
 	if term != prevLogTerm && prevLogIndex != 0 { // Err Log Doesn't Match
 		response.Reject = true
+		response.LogTerm = term
+		response.Index = r.RaftLog.FirstEntryWithTerm(term).GetIndex()
 		return
 	}
 
@@ -128,8 +147,16 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message) {
 	}
 
 	if m.GetTerm() == r.Term && r.State == StateLeader { // prevent old rpc
-		if m.GetReject() { // prev log conlicts with follower, decrease NEXT and retry
-			r.Prs[m.GetFrom()].Next--
+		if m.GetReject() {
+			// Upon receiving a conflict response, the leader should first search its log for conflictTerm.
+			if ent := r.RaftLog.LastEntryWithTerm(m.GetLogTerm()); ent != nil {
+				// If it finds an entry in its log with that term, it should set nextIndex to be
+				// the one beyond the index of the last entry in that term in its log.
+				r.Prs[m.GetFrom()].Next = ent.GetIndex() + 1
+			} else {
+				// If it does not find an entry with that term, it should set nextIndex = conflictIndex.
+				r.Prs[m.GetFrom()].Next = m.GetIndex()
+			}
 			r.sendAppend(m.GetFrom())
 		} else { // update MATCH with last log infomation of follower, and LeaderCommit
 			r.Prs[m.GetFrom()].Match = m.GetIndex()

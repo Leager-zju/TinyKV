@@ -118,6 +118,47 @@ func (l *RaftLog) LastAppend() *pb.Entry {
 	return &l.entries[l.length()-1]
 }
 
+func (l *RaftLog) FirstEntryWithTerm(term uint64) *pb.Entry {
+	left, right := None, l.length()-1
+	for left < right {
+		mid := left + (right-left)/2
+		ent := &l.entries[mid]
+		if ent.GetTerm() == term {
+			right = mid
+		} else if ent.GetTerm() > term {
+			right = mid - 1
+		} else {
+			left = mid + 1
+		}
+	}
+	if l.entries[left].GetTerm() != term {
+		return nil
+	}
+	return &l.entries[left]
+}
+
+func (l *RaftLog) LastEntryWithTerm(term uint64) *pb.Entry {
+	left, right := None, l.length()-1
+	for left < right-1 {
+		mid := left + (right-left)/2
+		ent := &l.entries[mid]
+		if ent.GetTerm() == term {
+			left = mid
+		} else if ent.GetTerm() < term {
+			left = mid + 1
+		} else {
+			right = mid - 1
+		}
+	}
+	if l.entries[right].GetTerm() == term {
+		return &l.entries[right]
+	}
+	if l.entries[left].GetTerm() == term {
+		return &l.entries[left]
+	}
+	return nil
+}
+
 func (l *RaftLog) appendEntry(e pb.Entry) {
 	l.entries = append(l.entries, e)
 }

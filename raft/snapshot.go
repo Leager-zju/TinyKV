@@ -17,7 +17,7 @@ func (r *Raft) sendSnapshot(to uint64) {
 		Term:     r.Term,
 		Snapshot: &newSnapshot,
 	}
-	r.Prs[to].Next = request.GetSnapshot().GetMetadata().GetIndex() + 1
+	// r.Prs[to].Next = request.GetSnapshot().GetMetadata().GetIndex() + 1
 	r.sendNewMsg(request)
 }
 
@@ -46,7 +46,6 @@ func (r *Raft) handleSnapshot(m pb.Message) {
 	}
 
 	// 尽可能无条件接收，并直接覆盖所有状态，ready 收到非空 snapshot 后会直接应用到 DB 中
-	DPrintf("[%s] receive snapshot {%+v}", RaftToString(r), m.GetSnapshot())
 	r.becomeFollower(m.GetTerm(), m.GetFrom())
 	response.Term = m.GetTerm()
 	response.Index = meta.GetIndex()
