@@ -21,7 +21,7 @@ func (r *Raft) sendAppend(to uint64) bool {
 	nextIndex := r.Prs[to].Next
 	prevIndex := nextIndex - 1
 
-	DPrintf("[%s] Find %d %d %d", RaftToString(r), to, nextIndex, r.RaftLog.TruncatedIndex())
+	DPrintf("[%s] Find %d next %d", RaftToString(r), to, nextIndex)
 	if nextIndex <= r.RaftLog.TruncatedIndex() {
 		r.sendSnapshot(to)
 		return true
@@ -36,9 +36,12 @@ func (r *Raft) sendAppend(to uint64) bool {
 	}
 	defer r.sendNewMsg(request)
 
-	for idx := r.RaftLog.Index2idx(nextIndex); idx < r.RaftLog.length(); idx++ {
-		request.Entries = append(request.Entries, &r.RaftLog.entries[idx])
+	if nextIndex <= r.RaftLog.LastIndex() {
+		for idx := r.RaftLog.Index2idx(nextIndex); idx < r.RaftLog.length(); idx++ {
+			request.Entries = append(request.Entries, &r.RaftLog.entries[idx])
+		}
 	}
+
 	request.LogTerm, _ = r.RaftLog.Term(prevIndex)
 	request.Index = prevIndex
 	return true

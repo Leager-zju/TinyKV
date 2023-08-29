@@ -30,7 +30,7 @@ func MessageToString(m pb.Message) string {
 	case pb.MessageType_MsgPropose:
 		return fmt.Sprintf("{Type: %s, Entries: %v}", pb.MessageType_name[int32(m.GetMsgType())], m.GetEntries())
 	case pb.MessageType_MsgAppend:
-		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, PrevLogTerm: %d, PrevLogIndex: %d, LeaderCommit: %d, Entries: %v}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetLogTerm(), m.GetIndex(), m.GetCommit(), m.GetEntries())
+		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, PrevLogTerm: %d, PrevLogIndex: %d, LeaderCommit: %d, Entries length %d}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetLogTerm(), m.GetIndex(), m.GetCommit(), len(m.GetEntries()))
 	case pb.MessageType_MsgAppendResponse:
 		return fmt.Sprintf("{Type: %s, Term: %d, From: %d, To: %d, ConflictLogTerm: %d, ConflictLogIndex: %d, Reject: %t}", pb.MessageType_name[int32(m.GetMsgType())], m.GetTerm(), m.GetFrom(), m.GetTo(), m.GetLogTerm(), m.GetIndex(), m.GetReject())
 	case pb.MessageType_MsgRequestVote:

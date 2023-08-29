@@ -129,7 +129,7 @@ func (m *MockSchedulerClient) Bootstrap(ctx context.Context, store *metapb.Store
 		Header: &schedulerpb.ResponseHeader{ClusterId: m.clusterID},
 	}
 
-	if m.bootstrapped == true || len(m.regionsKey) != 0 {
+	if m.bootstrapped || len(m.regionsKey) != 0 {
 		m.bootstrapped = true
 		resp.Header.Error = &schedulerpb.Error{
 			Type:    schedulerpb.ErrorType_ALREADY_BOOTSTRAPPED,

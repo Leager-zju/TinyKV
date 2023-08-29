@@ -70,7 +70,7 @@ func (r *SchedulerTaskHandler) onRegionHeartbeatResponse(resp *schedulerpb.Regio
 		r.sendAdminRequest(resp.RegionId, resp.RegionEpoch, resp.TargetPeer, &raft_cmdpb.AdminRequest{
 			CmdType: raft_cmdpb.AdminCmdType_ChangePeer,
 			ChangePeer: &raft_cmdpb.ChangePeerRequest{
-				ChangeType: changePeer.ChangeType,
+				ChangeType: changePeer.ChangeType, 
 				Peer:       changePeer.Peer,
 			},
 		}, message.NewCallback())
@@ -108,13 +108,16 @@ func (r *SchedulerTaskHandler) onHeartbeat(t *SchedulerRegionHeartbeatTask) {
 		size = int64(*t.ApproximateSize)
 	}
 
+	// local data structure => proto buffer msg
 	req := &schedulerpb.RegionHeartbeatRequest{
 		Region:          t.Region,
 		Leader:          t.Peer,
 		PendingPeers:    t.PendingPeers,
 		ApproximateSize: uint64(size),
 	}
-	r.SchedulerClient.RegionHeartbeat(req)
+	if err := r.SchedulerClient.RegionHeartbeat(req); err != nil {
+		log.Panic(err)
+	}
 }
 
 func (r *SchedulerTaskHandler) onStoreHeartbeat(t *SchedulerStoreHeartbeatTask) {

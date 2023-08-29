@@ -15,8 +15,6 @@
 package raft
 
 import (
-	"fmt"
-
 	"github.com/pingcap-incubator/tinykv/log"
 
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
@@ -106,22 +104,28 @@ func (l *RaftLog) At(Index uint64) *pb.Entry {
 
 func (l *RaftLog) Index2idx(Index uint64) uint64 {
 	if Index < l.TruncatedIndex() {
-		panic(fmt.Sprintf("Index %d UnderFlow", Index))
+		log.Panicf("Index %d Under Flow, truncatedIndex %d", Index, l.TruncatedIndex())
+	}
+	if Index > l.LastIndex() {
+		log.Panicf("Index %d Over Flow, lastIndex %d", Index, l.LastIndex())
 	}
 	return Index - l.TruncatedIndex()
 }
 
 func (l *RaftLog) LastAppend() *pb.Entry {
 	if l.length() == 0 {
-		return nil
+		log.Panic("raft log length can not be 0")
 	}
 	return &l.entries[l.length()-1]
 }
 
 func (l *RaftLog) FirstEntryWithTerm(term uint64) *pb.Entry {
 	left, right := None, l.length()-1
-	for left < right {
+	for left < right-1 {
 		mid := left + (right-left)/2
+		if mid > l.length() {
+			log.Panicf("index [%d %d %d] out of range %d", left, mid, right, l.length()-1)
+		}
 		ent := &l.entries[mid]
 		if ent.GetTerm() == term {
 			right = mid
@@ -131,16 +135,23 @@ func (l *RaftLog) FirstEntryWithTerm(term uint64) *pb.Entry {
 			left = mid + 1
 		}
 	}
-	if l.entries[left].GetTerm() != term {
-		return nil
+
+	if left < l.length() && l.entries[left].GetTerm() == term {
+		return &l.entries[left]
 	}
-	return &l.entries[left]
+	if right < l.length() && l.entries[right].GetTerm() == term {
+		return &l.entries[right]
+	}
+	return nil
 }
 
 func (l *RaftLog) LastEntryWithTerm(term uint64) *pb.Entry {
 	left, right := None, l.length()-1
-	for left < right-1 {
+	for left+1 < right {
 		mid := left + (right-left)/2
+		if mid > l.length() {
+			log.Panicf("index [%d %d %d] out of range %d", left, mid, right, l.length()-1)
+		}
 		ent := &l.entries[mid]
 		if ent.GetTerm() == term {
 			left = mid
@@ -150,10 +161,11 @@ func (l *RaftLog) LastEntryWithTerm(term uint64) *pb.Entry {
 			right = mid - 1
 		}
 	}
-	if l.entries[right].GetTerm() == term {
+
+	if right < l.length() && l.entries[right].GetTerm() == term {
 		return &l.entries[right]
 	}
-	if l.entries[left].GetTerm() == term {
+	if left < l.length() && l.entries[left].GetTerm() == term {
 		return &l.entries[left]
 	}
 	return nil

@@ -120,9 +120,11 @@ func (ps *PeerStorage) Entries(low, high uint64) ([]eraftpb.Entry, error) {
 	}
 	// If we get the correct number of entries, returns.
 	if len(buf) == int(high-low) {
+		log.Infof("%s entry[%d:%d) get success . Result: %+v", ps.Tag, low, high, buf)
 		return buf, nil
 	}
 	// Here means we don't fetch enough entries.
+	log.Infof("%s entry[%d:%d) get error unavaiable. Result: %+v", ps.Tag, low, high, buf)
 	return nil, raft.ErrUnavailable
 }
 
@@ -296,9 +298,10 @@ func ClearMeta(engines *engine_util.Engines, kvWB, raftWB *engine_util.WriteBatc
 	}
 	raftWB.DeleteMeta(meta.RaftStateKey(regionID))
 	DPrintf(
-		"[region %d] clear peer 1 meta key 1 apply key 1 raft key and %d raft logs, takes %v",
+		"[region %d] clear peer 1 meta key 1 apply key 1 raft key and %d raft logs(%d~%d), takes %v",
 		regionID,
 		lastIndex+1-firstIndex,
+		firstIndex, lastIndex,
 		time.Since(start),
 	)
 	return nil
@@ -311,6 +314,7 @@ func (ps *PeerStorage) Append(entries []eraftpb.Entry, raftWB *engine_util.Write
 	curLastIndex := entries[len(entries)-1].GetIndex()
 	curLastTerm := entries[len(entries)-1].GetIndex()
 	prevLastIndex := ps.raftState.GetLastIndex()
+	DPrintf("%s append [%d:%d], delete [%d:%d]", ps.Tag, entries[0].GetIndex(), curLastIndex, curLastIndex+1, prevLastIndex)
 	for Index := curLastIndex + 1; Index <= prevLastIndex; Index++ {
 		raftWB.DeleteMeta(meta.RaftLogKey(ps.Region().GetId(), Index))
 	}
@@ -329,10 +333,15 @@ func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_ut
 	DPrintf("%s begin to apply snapshot", ps.Tag)
 	snapData := new(rspb.RaftSnapshotData)
 	if err := snapData.Unmarshal(snapshot.Data); err != nil {
+		DPrintf("%s snapdata unmarshal fail", ps.Tag)
 		return nil, err
 	}
 
 	metaData := snapshot.GetMetadata()
+	if snapData.GetRegion().GetRegionEpoch().GetConfVer() <= ps.Region().GetRegionEpoch().GetConfVer() || snapData.GetRegion().GetRegionEpoch().GetVersion() <= ps.Region().GetRegionEpoch().GetVersion() {
+		DPrintf("%s Get Stale snapshot with region %+v, but current region is %+v", ps.Tag, snapData.GetRegion(), ps.Region())
+		return nil, nil
+	}
 	applySnapResult := &ApplySnapResult{
 		PrevRegion: ps.Region(),
 		Region:     snapData.GetRegion(),
@@ -376,28 +385,23 @@ func (ps *PeerStorage) ApplySnapshot(snapshot *eraftpb.Snapshot, kvWB *engine_ut
 
 	meta.WriteRegionState(kvWB, snapData.GetRegion(), rspb.PeerState_Normal)
 	ps.region = snapData.GetRegion()
+	DPrintf("%s apply snapshot over", ps.Tag)
 	return applySnapResult, nil
 }
 
 // Save memory states to disk.
 // Do not modify ready in this function, this is a requirement to advance the ready object properly later.
 func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, error) {
-	hardState, unstabledEntries, committedEntries := ready.HardState, ready.Entries, ready.CommittedEntries
+	hardState, unstabledEntries := ready.HardState, ready.Entries
 	var result *ApplySnapResult = nil
 	var err error
+
 	kvWB := new(engine_util.WriteBatch)
 	raftWB := new(engine_util.WriteBatch)
 
 	if !raft.IsEmptySnap(&ready.Snapshot) {
 		result, err = ps.ApplySnapshot(&ready.Snapshot, kvWB, raftWB)
 		if err != nil {
-			log.Panic(err)
-		}
-	}
-
-	if n := len(committedEntries); n > 0 {
-		ps.applyState.AppliedIndex = committedEntries[n-1].GetIndex()
-		if err = kvWB.SetMeta(meta.ApplyStateKey(ps.Region().GetId()), ps.applyState); err != nil {
 			log.Panic(err)
 		}
 	}
@@ -421,6 +425,8 @@ func (ps *PeerStorage) SaveReadyState(ready *raft.Ready) (*ApplySnapResult, erro
 
 	kvWB.MustWriteToDB(ps.Engines.Kv)
 	raftWB.MustWriteToDB(ps.Engines.Raft)
+
+	DPrintf("%s Save Ready {%+v} OK", ps.Tag, *ready)
 	return result, nil
 }
 

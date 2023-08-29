@@ -224,6 +224,7 @@ func (p *peer) Destroy(engine *engine_util.Engines, keepData bool) error {
 	}
 
 	for _, proposal := range p.proposals {
+		DPrintf("%s Done region removed error", p.Tag)
 		NotifyReqRegionRemoved(region.Id, proposal.cb)
 	}
 	p.proposals = nil
@@ -273,7 +274,7 @@ func (p *peer) Send(trans Transport, msgs []eraftpb.Message) {
 	}
 }
 
-// / Collects all pending peers and update `peers_start_pending_time`.
+// / Collects all pending peers(whose match < truncated idx) and update `peers_start_pending_time`.
 func (p *peer) CollectPendingPeers() []*metapb.Peer {
 	pendingPeers := make([]*metapb.Peer, 0, len(p.Region().GetPeers()))
 	truncatedIdx := p.peerStorage.truncatedIndex()
@@ -287,7 +288,7 @@ func (p *peer) CollectPendingPeers() []*metapb.Peer {
 				if _, ok := p.PeersStartPendingTime[id]; !ok {
 					now := time.Now()
 					p.PeersStartPendingTime[id] = now
-					log.Debugf("%v peer %v start pending at %v", p.Tag, id, now)
+					log.Infof("%v peer %v start pending at %v", p.Tag, id, now)
 				}
 			}
 		}
@@ -348,12 +349,14 @@ func (p *peer) HeartbeatScheduler(ch chan<- worker.Task) {
 	if err != nil {
 		return
 	}
-	ch <- &runner.SchedulerRegionHeartbeatTask{
+	newTask := &runner.SchedulerRegionHeartbeatTask{
 		Region:          clonedRegion,
 		Peer:            p.Meta,
 		PendingPeers:    p.CollectPendingPeers(),
 		ApproximateSize: p.ApproximateSize,
 	}
+	DPrintf("%s HeartBeat %+v", p.Tag, newTask)
+	ch <- newTask
 }
 
 func (p *peer) sendRaftMessage(msg eraftpb.Message, trans Transport) error {
