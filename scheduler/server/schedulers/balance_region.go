@@ -14,6 +14,9 @@
 package schedulers
 
 import (
+	"sort"
+
+	"github.com/pingcap-incubator/tinykv/log"
 	"github.com/pingcap-incubator/tinykv/scheduler/server/core"
 	"github.com/pingcap-incubator/tinykv/scheduler/server/schedule"
 	"github.com/pingcap-incubator/tinykv/scheduler/server/schedule/operator"
@@ -81,22 +84,84 @@ func (s *balanceRegionScheduler) Schedule(cluster opt.Cluster) *operator.Operato
 	// 		Then the Scheduler tries to find regions to
 	// 		move from the store with the biggest region size.
 	stores := cluster.GetStores()
-	remove, maxm := 0, 0
-	for i, store := range stores {
-		if cnt := cluster.GetStoreRegionCount(store.GetID()); cnt > maxm {
-			maxm = cnt
-			remove = i
-		}
-	}
+	sort.Slice(stores, func(i, j int) bool {
+		return stores[i].GetRegionSize() > stores[j].GetRegionSize()
+	})
 
+	var regionToMove *core.RegionInfo
+	var original int
+	target := len(stores) - 1
 	// 2.	First, it will try to select a pending region.
 	// 		If there isn’t a pending region, it will try to find a follower region.
 	// 		If it still cannot pick out one region, it will try to pick leader regions.
-	// 		Finally, it will select out the region to move, or the Scheduler will try the next store which has a smaller region size until all stores will have been tried.
-	store := stores[remove]
-	cluster.GetPendingRegionsWithLock(store.GetID(), func(container core.RegionsContainer) {
+	// 		Finally, it will select out the region to move,
+	// 		or the Scheduler will try the next store which has a smaller region size
+	// 		until all stores will have been tried.
+	for i, store := range stores {
+		// In short, a suitable store should be up
+		// and the down time cannot be longer than MaxStoreDownTime of the cluster
+		// If the difference between the original and target stores’ region sizes is too small,
+		// after we move the region from the original store to the target store,
+		// the Scheduler may want to move back again next time.
+		// So we have to make sure that the difference has to be bigger than
+		// [two times the approximate size of the region], which ensures that after moving,
+		// the target store’s region size is still smaller than the original store.
+		if !store.IsUp() || store.DownTime() > cluster.GetMaxStoreDownTime() {
+			continue
+		}
+		cluster.GetPendingRegionsWithLock(store.GetID(), func(container core.RegionsContainer) {
+			regionToMove = container.RandomRegion([]byte{}, []byte{})
+		})
+		if regionToMove != nil && stores[i].GetRegionSize() > stores[target].GetRegionSize()+regionToMove.GetApproximateSize()*2 {
+			original = i
+			break
+		}
 
-	})
+		cluster.GetFollowersWithLock(store.GetID(), func(container core.RegionsContainer) {
+			regionToMove = container.RandomRegion([]byte{}, []byte{})
+		})
+		if regionToMove != nil && stores[i].GetRegionSize() > stores[target].GetRegionSize()+regionToMove.GetApproximateSize()*2 {
+			original = i
+			break
+		}
 
-	return nil
+		cluster.GetLeadersWithLock(store.GetID(), func(container core.RegionsContainer) {
+			regionToMove = container.RandomRegion([]byte{}, []byte{})
+		})
+		if regionToMove != nil && stores[i].GetRegionSize() > stores[target].GetRegionSize()+regionToMove.GetApproximateSize()*2 {
+			original = i
+			break
+		}
+	}
+
+	if regionToMove == nil {
+		log.Infof("No region to remove")
+		return nil
+	}
+
+	for target >= 0 {
+		ids := cluster.GetRegion(regionToMove.GetID()).GetStoreIds()
+		if _, ok := ids[stores[target].GetID()]; !ok {
+			break
+		}
+		target--
+		// else: target store has the same region as regionToMove
+	}
+
+	// 3. After you pick up one region to move, the Scheduler will select a store as the target.
+	// 		Actually, the Scheduler will select the store with the smallest region size.
+	//		Then the Scheduler will judge whether this movement is valuable,
+	//		by checking the difference between region sizes of the original store and the target store.
+	//		If the difference is big enough, the Scheduler should allocate a new peer on the target store
+	//		and create a move peer operator.
+	newPeer, err := cluster.AllocPeer(stores[target].GetID())
+	if err != nil {
+		log.Panic(err)
+	}
+	op, err := operator.CreateMovePeerOperator(s.GetName(), cluster, regionToMove, operator.OpBalance, stores[original].GetID(), stores[target].GetID(), newPeer.GetId())
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Infof("New Operator: %+v", op)
+	return op
 }
