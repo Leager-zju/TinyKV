@@ -278,8 +278,44 @@ func (c *RaftCluster) handleStoreHeartbeat(stats *schedulerpb.StoreStats) error 
 
 // processRegionHeartbeat updates the region information.
 func (c *RaftCluster) processRegionHeartbeat(region *core.RegionInfo) error {
-	// Your Code Here (3C).
+	regionMeta := region.GetMeta()
+	regionId := region.GetID()
+	regionEpoch := region.GetRegionEpoch()
 
+	{ // check credible
+		originMeta, _ := c.GetRegionByID(regionId)
+		if originMeta != nil {
+			// 1. Check whether there is a region with the same Id in local storage.
+			// 		If there is and at least one of the heartbeats’ conf_ver and version is less than its,
+			// 		this heartbeat region is stale
+			originEpoch := originMeta.GetRegionEpoch()
+			if regionEpoch.GetConfVer() < originEpoch.GetConfVer() || regionEpoch.GetVersion() < originEpoch.GetVersion() {
+				return ErrRegionIsStale(regionMeta, originMeta)
+			}
+		}
+
+		overlaps := c.core.GetOverlaps(region)
+		// 2. If there isn’t, scan all regions that overlap with it.
+		// 		The heartbeats’ conf_ver and version should be greater or equal than all of them,
+		// 		or the region is stale.
+		for _, overlap := range overlaps {
+			overlapRegionMeta := overlap.GetMeta()
+			overlapRegionEpoch := overlap.GetRegionEpoch()
+			if regionEpoch.GetConfVer() < overlapRegionEpoch.GetConfVer() || regionEpoch.GetVersion() < overlapRegionEpoch.GetVersion() {
+				return ErrRegionIsStale(regionMeta, overlapRegionMeta)
+			}
+		}
+	}
+
+	// Don’t worry. You don’t need to find a strict sufficient
+	// and necessary condition.
+	// Redundant updates won’t affect correctness.
+	if err := c.putRegion(region); err != nil {
+		return err
+	}
+	for _, peer := range region.GetPeers() {
+		c.updateStoreStatusLocked(peer.GetStoreId())
+	}
 	return nil
 }
 

@@ -9,7 +9,7 @@ import (
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
-const DEBUG bool = true
+const DEBUG bool = false
 
 func DPrintf(format string, a ...interface{}) {
 	if DEBUG {

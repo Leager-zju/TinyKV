@@ -162,14 +162,12 @@ func getAppliedIdxTermForSnapshot(raft *badger.DB, kv *badger.Txn, regionId uint
 }
 
 func doSnapshot(engines *engine_util.Engines, mgr *snap.SnapManager, regionId uint64) (*eraftpb.Snapshot, error) {
-	log.Debugf("begin to generate a snapshot. [regionId: %d]", regionId)
-
 	txn := engines.Kv.NewTransaction(false)
-
 	index, term, err := getAppliedIdxTermForSnapshot(engines.Raft, txn, regionId)
 	if err != nil {
 		return nil, err
 	}
+	log.Infof("begin to generate a snapshot. [regionId: %d] At Index: %d, Term: %d", regionId, index, term)
 
 	key := snap.SnapKey{RegionID: regionId, Index: index, Term: term}
 	mgr.Register(key, snap.SnapEntryGenerating)
@@ -204,6 +202,8 @@ func doSnapshot(engines *engine_util.Engines, mgr *snap.SnapManager, regionId ui
 	if err != nil {
 		return nil, err
 	}
+
+	log.Infof("[region %d] Get Snapshot Data %+v, kvs length %d", regionId, snapshotData, len(snapshotData.Data))
 	snapshot.Data, err = snapshotData.Marshal()
 	return snapshot, err
 }

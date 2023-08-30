@@ -5,13 +5,13 @@ import (
 )
 
 func (r *Raft) handleTransferLeader(m pb.Message) {
-	if r.State != StateLeader && m.GetFrom() == r.id {
-		r.Step(pb.Message{
-			MsgType: pb.MessageType_MsgTimeoutNow,
-			To:      r.id,
-			From:    r.id,
-			Term:    r.Term,
+	if r.State != StateLeader { // 非 leader 收到后，移交给 leader
+		r.sendNewMsg(&pb.Message{
+			MsgType: pb.MessageType_MsgTransferLeader,
+			To:      r.Lead,
+			From:    m.GetFrom(),
 		})
+		return
 	}
 
 	if r.State == StateLeader && m.GetFrom() != r.id {

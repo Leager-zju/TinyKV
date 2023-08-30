@@ -279,7 +279,9 @@ func (c *Cluster) GetRegion(key []byte) *metapb.Region {
 		// retry to get the region again.
 		SleepMS(20)
 	}
-	panic(fmt.Sprintf("find no region for %s", hex.EncodeToString(key)))
+
+	log.Panicf("find no region for %s, %+v", hex.EncodeToString(key), key)
+	return nil
 }
 
 func (c *Cluster) GetRandomRegion() *metapb.Region {
@@ -291,6 +293,7 @@ func (c *Cluster) GetStoreIdsOfRegion(regionID uint64) []uint64 {
 	if err != nil {
 		panic(err)
 	}
+
 	peers := region.GetPeers()
 	storeIds := make([]uint64, len(peers))
 	for i, peer := range peers {

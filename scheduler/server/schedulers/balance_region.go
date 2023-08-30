@@ -76,7 +76,27 @@ func (s *balanceRegionScheduler) IsScheduleAllowed(cluster opt.Cluster) bool {
 }
 
 func (s *balanceRegionScheduler) Schedule(cluster opt.Cluster) *operator.Operator {
-	// Your Code Here (3C).
+	// 1. First, the Scheduler will select all suitable stores.
+	// 		Then sort them according to their region size.
+	// 		Then the Scheduler tries to find regions to
+	// 		move from the store with the biggest region size.
+	stores := cluster.GetStores()
+	remove, maxm := 0, 0
+	for i, store := range stores {
+		if cnt := cluster.GetStoreRegionCount(store.GetID()); cnt > maxm {
+			maxm = cnt
+			remove = i
+		}
+	}
+
+	// 2.	First, it will try to select a pending region.
+	// 		If there isn’t a pending region, it will try to find a follower region.
+	// 		If it still cannot pick out one region, it will try to pick leader regions.
+	// 		Finally, it will select out the region to move, or the Scheduler will try the next store which has a smaller region size until all stores will have been tried.
+	store := stores[remove]
+	cluster.GetPendingRegionsWithLock(store.GetID(), func(container core.RegionsContainer) {
+
+	})
 
 	return nil
 }

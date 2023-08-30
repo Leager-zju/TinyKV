@@ -288,7 +288,7 @@ func (p *peer) CollectPendingPeers() []*metapb.Peer {
 				if _, ok := p.PeersStartPendingTime[id]; !ok {
 					now := time.Now()
 					p.PeersStartPendingTime[id] = now
-					log.Infof("%v peer %v start pending at %v", p.Tag, id, now)
+					DPrintf("%v peer %v start pending at %v", p.Tag, id, now)
 				}
 			}
 		}

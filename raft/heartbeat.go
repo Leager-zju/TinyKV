@@ -21,8 +21,8 @@ func (r *Raft) sendAppend(to uint64) bool {
 	nextIndex := r.Prs[to].Next
 	prevIndex := nextIndex - 1
 
-	DPrintf("[%s] Find %d next %d", RaftToString(r), to, nextIndex)
 	if nextIndex <= r.RaftLog.TruncatedIndex() {
+		DPrintf("[%s] Find %d next %d, try to send snapshot", RaftToString(r), to, nextIndex)
 		r.sendSnapshot(to)
 		return true
 	}

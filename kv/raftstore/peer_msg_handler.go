@@ -336,12 +336,11 @@ func (d *peerMsgHandler) applyAdminCommand(msg *raft_cmdpb.RaftCmdRequest, entry
 			log.Panic(err)
 		}
 		d.ctx.router.register(newPeer)
-		d.ctx.router.send(split.GetNewRegionId(), message.Msg{Type: message.MsgTypeStart, RegionID: split.GetNewRegionId()})
+		d.ctx.router.send(newRegion2.GetId(), message.Msg{Type: message.MsgTypeStart, RegionID: newRegion2.GetId()})
 		d.updateStoreMeta(newPeer, nil, newRegion2)
 
 		if d.IsLeader() {
 			d.SendResponse(response, entry.GetIndex(), entry.GetTerm(), false)
-			// the newly created Peer will be created by heartbeat from the leader
 			d.HeartbeatScheduler(d.ctx.schedulerTaskSender)
 		}
 	default:
@@ -386,7 +385,7 @@ func (d *peerMsgHandler) HandleMsg(msg message.Msg) {
 		d.onTick()
 	case message.MsgTypeSplitRegion:
 		split := msg.Data.(*message.MsgSplitRegion)
-		log.Infof("%s on split with key {%v}", d.Tag, split.SplitKey)
+		DPrintf("%s on split with key {%+v}", d.Tag, split.SplitKey)
 		d.onPrepareSplitRegion(split.RegionEpoch, split.SplitKey, split.Callback)
 	case message.MsgTypeRegionApproximateSize:
 		d.onApproximateRegionSize(msg.Data.(uint64))
@@ -488,24 +487,6 @@ func (d *peerMsgHandler) proposeAdminCommand(msg *raft_cmdpb.RaftCmdRequest, cb 
 		if d.RaftGroup.Raft.PendingConfIndex > d.RaftGroup.Raft.RaftLog.Applied() {
 			return
 		}
-
-		// remove a leader of a 2-peers-group, do transfer leader first
-		if req.GetChangePeer().GetChangeType() == eraftpb.ConfChangeType_RemoveNode && req.GetChangePeer().GetPeer().GetId() == d.PeerId() {
-			p, maxm := uint64(0), uint64(0)
-			for peer, prs := range d.RaftGroup.GetProgress() {
-				if peer == d.PeerId() {
-					continue
-				}
-				if prs.Match > maxm {
-					maxm = prs.Match
-					p = peer
-				}
-			}
-			if p == 0 {
-				log.Panic("no peer can become leader")
-			}
-			d.RaftGroup.TransferLeader(p)
-		}
 		newConfChange := eraftpb.ConfChange{
 			ChangeType: req.GetChangePeer().GetChangeType(),
 			NodeId:     req.GetChangePeer().GetPeer().GetId(),
@@ -592,7 +573,7 @@ func (d *peerMsgHandler) ScheduleCompactLog(truncatedIndex uint64) {
 }
 
 func (d *peerMsgHandler) onRaftMsg(msg *rspb.RaftMessage) error {
-	log.Debugf("%s handle raft message %s from %d to %d",
+	DPrintf("%s handle raft message %s from %d to %d",
 		d.Tag, msg.GetMessage().GetMsgType(), msg.GetFromPeer().GetId(), msg.GetToPeer().GetId())
 	if !d.validateRaftMessage(msg) {
 		return nil

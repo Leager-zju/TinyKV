@@ -1,15 +1,18 @@
 package raft
 
 import (
+	"github.com/pingcap-incubator/tinykv/log"
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
 func (r *Raft) sendSnapshot(to uint64) {
 	newSnapshot, err := r.RaftLog.storage.Snapshot()
-	if err == ErrSnapshotTemporarilyUnavailable {
-		return
+	if err != nil {
+		log.Error(err)
+		if err == ErrSnapshotTemporarilyUnavailable {
+			return
+		}
 	}
-
 	request := &pb.Message{
 		MsgType:  pb.MessageType_MsgSnapshot,
 		To:       to,

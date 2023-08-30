@@ -52,7 +52,7 @@ type PeerStorage struct {
 
 // NewPeerStorage get the persist raftState from engines and return a peer storage
 func NewPeerStorage(engines *engine_util.Engines, region *metapb.Region, regionSched chan<- worker.Task, tag string) (*PeerStorage, error) {
-	log.Infof("%s creating storage for %s", tag, region.String())
+	DPrintf("%s creating storage for %s", tag, region.String())
 	raftState, err := meta.InitRaftLocalState(engines.Raft, region)
 	if err != nil {
 		return nil, err
@@ -120,11 +120,11 @@ func (ps *PeerStorage) Entries(low, high uint64) ([]eraftpb.Entry, error) {
 	}
 	// If we get the correct number of entries, returns.
 	if len(buf) == int(high-low) {
-		log.Infof("%s entry[%d:%d) get success . Result: %+v", ps.Tag, low, high, buf)
+		DPrintf("%s entry[%d:%d) get success . Result: %+v", ps.Tag, low, high, buf)
 		return buf, nil
 	}
 	// Here means we don't fetch enough entries.
-	log.Infof("%s entry[%d:%d) get error unavaiable. Result: %+v", ps.Tag, low, high, buf)
+	DPrintf("%s entry[%d:%d) get error unavaiable. Result: %+v", ps.Tag, low, high, buf)
 	return nil, raft.ErrUnavailable
 }
 
@@ -176,9 +176,8 @@ func (ps *PeerStorage) Snapshot() (eraftpb.Snapshot, error) {
 	}
 
 	if ps.snapTriedCnt >= 5 {
-		err := errors.Errorf("failed to get snapshot after %d times", ps.snapTriedCnt)
 		ps.snapTriedCnt = 0
-		return snapshot, err
+		return snapshot, errors.Errorf("failed to get snapshot after %d times", ps.snapTriedCnt)
 	}
 
 	DPrintf("%s requesting snapshot", ps.Tag)
@@ -238,6 +237,7 @@ func (ps *PeerStorage) validateSnap(snap *eraftpb.Snapshot) bool {
 		DPrintf("%s snapshot is stale, generate again, snapIndex: %d, truncatedIndex: %d", ps.Tag, idx, ps.truncatedIndex())
 		return false
 	}
+
 	var snapData rspb.RaftSnapshotData
 	if err := proto.UnmarshalMerge(snap.GetData(), &snapData); err != nil {
 		log.Errorf("%s failed to decode snapshot, it may be corrupted, err: %v", ps.Tag, err)
