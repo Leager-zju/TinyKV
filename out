@@ -1,183 +1,98 @@
 GO111MODULE=on go test -v --count=1 --parallel=1 -p=1 ./scheduler/server ./scheduler/server/schedulers -check.f="3C"
 === RUN   TestServer
-[2023/08/30 16:51:43.645 +00:00] [INFO] [server.go:129] ["PD Config"] [config="{\"client-urls\":\"http://127.0.0.1:45335\",\"peer-urls\":\"http://127.0.0.1:35047\",\"advertise-client-urls\":\"http://127.0.0.1:45335\",\"advertise-peer-urls\":\"http://127.0.0.1:35047\",\"name\":\"pd\",\"data-dir\":\"/tmp/test_pd4225851530\",\"force-new-cluster\":false,\"enable-grpc-gateway\":true,\"initial-cluster\":\"pd=http://127.0.0.1:35047\",\"initial-cluster-state\":\"new\",\"lease\":1,\"log\":{\"level\":\"\",\"format\":\"\",\"disable-timestamp\":false,\"file\":{\"filename\":\"\",\"max-size\":0,\"max-days\":0,\"max-backups\":0},\"development\":false,\"disable-caller\":false,\"disable-stacktrace\":false,\"disable-error-verbose\":false,\"sampling\":null},\"log-file\":\"\",\"log-level\":\"\",\"tso-save-interval\":\"200ms\",\"schedule\":{\"patrol-region-interval\":\"100ms\",\"max-store-down-time\":\"30m0s\",\"leader-schedule-limit\":4,\"region-schedule-limit\":2048,\"replica-schedule-limit\":64,\"schedulers-v2\":[{\"type\":\"balance-region\",\"args\":null,\"disable\":false,\"args-payload\":\"\"},{\"type\":\"balance-leader\",\"args\":null,\"disable\":false,\"args-payload\":\"\"}]},\"replication\":{\"max-replicas\":3},\"pd-server\":{\"max-reset-ts-gap\":86400000000000},\"quota-backend-bytes\":\"0B\",\"auto-compaction-mode\":\"periodic\",\"auto-compaction-retention-v2\":\"1h\",\"TickInterval\":\"100ms\",\"ElectionInterval\":\"3s\",\"security\":{\"cacert-path\":\"\",\"cert-path\":\"\",\"key-path\":\"\"},\"WarningMsgs\":null,\"DisableStrictReconfigCheck\":true,\"HeartbeatStreamBindInterval\":\"1m0s\",\"LeaderPriorityCheckInterval\":\"100ms\"}"]
-[2023/08/30 16:51:43.646 +00:00] [INFO] [server.go:159] ["start embed etcd"]
-[2023/08/30 16:51:43.646 +00:00] [INFO] [etcd.go:117] ["configuring peer listeners"] [listen-peer-urls="[http://127.0.0.1:35047]"]
-[2023/08/30 16:51:43.646 +00:00] [INFO] [etcd.go:127] ["configuring client listeners"] [listen-client-urls="[http://127.0.0.1:45335]"]
-[2023/08/30 16:51:43.646 +00:00] [INFO] [etcd.go:602] ["pprof is enabled"] [path=/debug/pprof]
-[2023/08/30 16:51:43.646 +00:00] [INFO] [etcd.go:299] ["starting an etcd server"] [etcd-version=3.4.3] [git-sha="Not provided (use ./build instead of go build)"] [go-version=go1.20.7] [go-os=linux] [go-arch=amd64] [max-cpu-set=96] [max-cpu-available=96] [member-initialized=false] [name=pd] [data-dir=/tmp/test_pd4225851530] [wal-dir=] [wal-dir-dedicated=] [member-dir=/tmp/test_pd4225851530/member] [force-new-cluster=false] [heartbeat-interval=100ms] [election-timeout=3s] [initial-election-tick-advance=true] [snapshot-count=100000] [snapshot-catchup-entries=5000] [initial-advertise-peer-urls="[http://127.0.0.1:35047]"] [listen-peer-urls="[http://127.0.0.1:35047]"] [advertise-client-urls="[http://127.0.0.1:45335]"] [listen-client-urls="[http://127.0.0.1:45335]"] [listen-metrics-urls="[]"] [cors="[*]"] [host-whitelist="[*]"] [initial-cluster="pd=http://127.0.0.1:35047"] [initial-cluster-state=new] [initial-cluster-token=etcd-cluster] [quota-size-bytes=2147483648] [pre-vote=false] [initial-corrupt-check=false] [corrupt-check-time-interval=0s] [auto-compaction-mode=periodic] [auto-compaction-retention=1h0m0s] [auto-compaction-interval=1h0m0s] [discovery-url=] [discovery-proxy=]
-[2023/08/30 16:51:43.668 +00:00] [INFO] [backend.go:79] ["opened backend db"] [path=/tmp/test_pd4225851530/member/snap/db] [took=22.038669ms]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:456] ["starting local member"] [local-member-id=d73ed541ecf8f872] [cluster-id=2233d4a2472ad600]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:1530] ["d73ed541ecf8f872 switched to configuration voters=()"]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:700] ["d73ed541ecf8f872 became follower at term 0"]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:383] ["newRaft d73ed541ecf8f872 [peers: [], term: 0, commit: 0, applied: 0, lastindex: 0, lastterm: 0]"]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:700] ["d73ed541ecf8f872 became follower at term 1"]
-[2023/08/30 16:51:43.691 +00:00] [INFO] [raft.go:1530] ["d73ed541ecf8f872 switched to configuration voters=(15510068645835896946)"]
-[2023/08/30 16:51:43.715 +00:00] [WARN] [store.go:1317] ["simple token is not cryptographically signed"]
-[2023/08/30 16:51:43.722 +00:00] [INFO] [quota.go:98] ["enabled backend quota with default value"] [quota-name=v3-applier] [quota-size-bytes=2147483648] [quota-size="2.1 GB"]
-[2023/08/30 16:51:43.730 +00:00] [INFO] [server.go:792] ["starting etcd server"] [local-member-id=d73ed541ecf8f872] [local-server-version=3.4.3] [cluster-version=to_be_decided]
-[2023/08/30 16:51:43.730 +00:00] [INFO] [server.go:658] ["started as single-node; fast-forwarding election ticks"] [local-member-id=d73ed541ecf8f872] [forward-ticks=29] [forward-duration=2.9s] [election-ticks=30] [election-timeout=3s]
-[2023/08/30 16:51:43.731 +00:00] [INFO] [raft.go:1530] ["d73ed541ecf8f872 switched to configuration voters=(15510068645835896946)"]
-[2023/08/30 16:51:43.731 +00:00] [INFO] [cluster.go:392] ["added member"] [cluster-id=2233d4a2472ad600] [local-member-id=d73ed541ecf8f872] [added-peer-id=d73ed541ecf8f872] [added-peer-peer-urls="[http://127.0.0.1:35047]"]
-[2023/08/30 16:51:43.733 +00:00] [INFO] [etcd.go:241] ["now serving peer/client/metrics"] [local-member-id=d73ed541ecf8f872] [initial-advertise-peer-urls="[http://127.0.0.1:35047]"] [listen-peer-urls="[http://127.0.0.1:35047]"] [advertise-client-urls="[http://127.0.0.1:45335]"] [listen-client-urls="[http://127.0.0.1:45335]"] [listen-metrics-urls="[]"]
-[2023/08/30 16:51:43.733 +00:00] [INFO] [etcd.go:576] ["serving peer traffic"] [address=127.0.0.1:35047]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [raft.go:923] ["d73ed541ecf8f872 is starting a new election at term 1"]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [raft.go:713] ["d73ed541ecf8f872 became candidate at term 2"]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [raft.go:824] ["d73ed541ecf8f872 received MsgVoteResp from d73ed541ecf8f872 at term 2"]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [raft.go:765] ["d73ed541ecf8f872 became leader at term 2"]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [node.go:325] ["raft.node: d73ed541ecf8f872 elected leader d73ed541ecf8f872 at term 2"]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [server.go:2016] ["published local member to cluster through raft"] [local-member-id=d73ed541ecf8f872] [local-member-attributes="{Name:pd ClientURLs:[http://127.0.0.1:45335]}"] [request-path=/0/members/d73ed541ecf8f872/attributes] [cluster-id=2233d4a2472ad600] [publish-timeout=11s]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [server.go:2501] ["setting up initial cluster version"] [cluster-version=3.4]
-[2023/08/30 16:51:44.793 +00:00] [INFO] [server.go:189] ["create etcd v3 client"] [endpoints="[http://127.0.0.1:45335]"]
-[2023/08/30 16:51:44.794 +00:00] [INFO] [serve.go:139] ["serving client traffic insecurely; this is strongly discouraged!"] [address=127.0.0.1:45335]
-[2023/08/30 16:51:44.798 +00:00] [INFO] [cluster.go:558] ["set initial cluster version"] [cluster-id=2233d4a2472ad600] [local-member-id=d73ed541ecf8f872] [cluster-version=3.4]
-[2023/08/30 16:51:44.798 +00:00] [INFO] [capability.go:76] ["enabled capabilities for version"] [cluster-version=3.4]
-[2023/08/30 16:51:44.798 +00:00] [INFO] [server.go:2533] ["cluster version is updated"] [cluster-version=3.4]
-[2023/08/30 16:51:44.802 +00:00] [INFO] [server.go:226] ["init cluster id"] [cluster-id=7273159054819736395]
-[2023/08/30 16:51:44.805 +00:00] [INFO] [server.go:599] ["start to campaign leader"] [campaign-leader-name=pd]
-[2023/08/30 16:51:44.810 +00:00] [INFO] [server.go:616] ["campaign leader ok"] [campaign-leader-name=pd]
-[2023/08/30 16:51:44.814 +00:00] [INFO] [tso.go:129] ["sync and save timestamp"] [last=1754/08/30 22:43:41.128 +00:00] [save=2023/08/30 16:51:45.014 +00:00] [next=2023/08/30 16:51:44.814 +00:00]
-[2023/08/30 16:51:44.818 +00:00] [INFO] [server.go:636] ["PD cluster leader is ready to serve"] [leader-name=pd]
-[2023/08/30 16:51:44.905 +00:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=1000]
-[2023/08/30 16:51:44.905 +00:00] [INFO] [server.go:333] ["try to bootstrap raft cluster"] [cluster-id=7273159054819736395] [request="header:<cluster_id:7273159054819736395 > store:<id:1 address:\"127.0.0.1:0\" > "]
-[2023/08/30 16:51:44.908 +00:00] [INFO] [server.go:383] ["bootstrap cluster ok"] [cluster-id=7273159054819736395]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [cluster.go:184] ["load stores"] [count=1] [cost=1.748027ms]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:125] ["coordinator starts to collect cluster information"]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:128] ["coordinator has finished cluster information preparation"]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:138] ["coordinator starts to run schedulers"]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:202] ["create scheduler"] [scheduler-name=balance-region-scheduler]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:202] ["create scheduler"] [scheduler-name=balance-leader-scheduler]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [coordinator.go:85] ["coordinator starts patrol regions"]
-[2023/08/30 16:51:44.914 +00:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:2 address:\"127.0.1.1:0\" "]
-[2023/08/30 16:51:44.915 +00:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:3 address:\"127.0.1.1:1\" "]
-[2023/08/30 16:51:44.915 +00:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:4 address:\"127.0.1.1:2\" "]
-[2023/08/30 16:51:44.923 +00:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=2000]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-[2023/08/30 16:51:44.927 +00:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=3000]
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:1169(1,1), createAt:2023-08-30 16:51:44.927415459 +0000 UTC m=+1.336904330, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 2007 on store 1, remove peer on store 3])
-[2023/08/30 16:51:44.927 +00:00] [INFO] [operator_controller.go:177] ["add operator"] [region-id=1169] [operator="\"balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:1169(1,1), createAt:2023-08-30 16:51:44.927415459 +0000 UTC m=+1.336904330, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 2007 on store 1, remove peer on store 3])\""]
-[2023/08/30 16:51:44.927 +00:00] [INFO] [operator_controller.go:254] ["send schedule command"] [region-id=1169] [step="add peer 2007 on store 1"] [source=create]
-[2023/08/30 16:51:44.931 +00:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=4000]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-[2023/08/30 16:51:44.944 +00:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=5000]
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:345(1,1), createAt:2023-08-30 16:51:44.944552143 +0000 UTC m=+1.354041011, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4012 on store 1, remove peer on store 3])
-[2023/08/30 16:51:44.944 +00:00] [INFO] [operator_controller.go:177] ["add operator"] [region-id=345] [operator="\"balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:345(1,1), createAt:2023-08-30 16:51:44.944552143 +0000 UTC m=+1.354041011, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4012 on store 1, remove peer on store 3])\""]
-[2023/08/30 16:51:44.944 +00:00] [INFO] [operator_controller.go:254] ["send schedule command"] [region-id=345] [step="add peer 4012 on store 1"] [source=create]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:777(1,1), createAt:2023-08-30 16:51:44.959921582 +0000 UTC m=+1.369410450, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4013 on store 1, remove peer on store 3])
-[2023/08/30 16:51:44.960 +00:00] [INFO] [operator_controller.go:177] ["add operator"] [region-id=777] [operator="\"balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:777(1,1), createAt:2023-08-30 16:51:44.959921582 +0000 UTC m=+1.369410450, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4013 on store 1, remove peer on store 3])\""]
-[2023/08/30 16:51:44.960 +00:00] [INFO] [operator_controller.go:254] ["send schedule command"] [region-id=777] [step="add peer 4013 on store 1"] [source=create]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:289(1,1), createAt:2023-08-30 16:51:44.972606669 +0000 UTC m=+1.382095537, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4014 on store 1, remove peer on store 3])
-[2023/08/30 16:51:44.972 +00:00] [INFO] [operator_controller.go:177] ["add operator"] [region-id=289] [operator="\"balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:289(1,1), createAt:2023-08-30 16:51:44.972606669 +0000 UTC m=+1.382095537, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4014 on store 1, remove peer on store 3])\""]
-[2023/08/30 16:51:44.972 +00:00] [INFO] [operator_controller.go:254] ["send schedule command"] [region-id=289] [step="add peer 4014 on store 1"] [source=create]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:919(1,1), createAt:2023-08-30 16:51:44.983143511 +0000 UTC m=+1.392632380, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4015 on store 1, remove peer on store 3])
-[2023/08/30 16:51:44.983 +00:00] [INFO] [operator_controller.go:177] ["add operator"] [region-id=919] [operator="\"balance-region-scheduler {mv peer: store 3 to 1} (kind:region,balance, region:919(1,1), createAt:2023-08-30 16:51:44.983143511 +0000 UTC m=+1.392632380, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4015 on store 1, remove peer on store 3])\""]
-[2023/08/30 16:51:44.983 +00:00] [INFO] [operator_controller.go:254] ["send schedule command"] [region-id=919] [step="add peer 4015 on store 1"] [source=create]
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-balance_region.go:138: [info] No region to remove
-[2023/08/30 16:51:45.000 +00:00] [INFO] [server.go:271] ["closing server"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [coordinator.go:92] ["patrol regions has been stopped"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [server.go:662] ["server is closed"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [server.go:679] ["server is closed, exit etcd leader loop"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [cluster.go:218] ["coordinator is stopping"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [coordinator.go:308] ["scheduler has been stopped"] [scheduler-name=balance-leader-scheduler] [error="context canceled"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [cluster.go:201] ["background jobs has been stopped"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [coordinator.go:308] ["scheduler has been stopped"] [scheduler-name=balance-region-scheduler] [error="context canceled"]
-[2023/08/30 16:51:45.000 +00:00] [INFO] [cluster.go:214] ["coordinator has been stopped"]
-[2023/08/30 16:51:45.001 +00:00] [INFO] [server.go:572] ["server is closed, return leader loop"]
-[2023/08/30 16:51:45.001 +00:00] [INFO] [etcd.go:360] ["closing etcd server"] [name=pd] [data-dir=/tmp/test_pd4225851530] [advertise-peer-urls="[http://127.0.0.1:35047]"] [advertise-client-urls="[http://127.0.0.1:45335]"]
-[2023/08/30 16:51:45.001 +00:00] [INFO] [server.go:1464] ["skipped leadership transfer for single voting member cluster"] [local-member-id=d73ed541ecf8f872] [current-leader-member-id=d73ed541ecf8f872]
-[2023/08/30 16:51:45.001 +00:00] [WARN] [grpclog.go:60] ["transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:45335->127.0.0.1:36930: use of closed network connection"]
-[2023/08/30 16:51:45.001 +00:00] [WARN] [grpclog.go:60] ["transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:45335->127.0.0.1:36936: use of closed network connection"]
-[2023/08/30 16:51:45.001 +00:00] [WARN] [grpclog.go:60] ["grpc: addrConn.createTransport failed to connect to {127.0.0.1:45335 0  <nil>}. Err :connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:45335: connect: connection refused\". Reconnecting..."]
-[2023/08/30 16:51:45.012 +00:00] [INFO] [etcd.go:555] ["stopping serving peer traffic"] [address=127.0.0.1:35047]
-[2023/08/30 16:51:45.013 +00:00] [INFO] [etcd.go:562] ["stopped serving peer traffic"] [address=127.0.0.1:35047]
-[2023/08/30 16:51:45.013 +00:00] [INFO] [etcd.go:364] ["closed etcd server"] [name=pd] [data-dir=/tmp/test_pd4225851530] [advertise-peer-urls="[http://127.0.0.1:35047]"] [advertise-client-urls="[http://127.0.0.1:45335]"]
-[2023/08/30 16:51:45.013 +00:00] [INFO] [server.go:290] ["close server"]
+[2023/08/31 11:50:07.155 +08:00] [INFO] [server.go:129] ["PD Config"] [config="{\"client-urls\":\"http://127.0.0.1:42983\",\"peer-urls\":\"http://127.0.0.1:38611\",\"advertise-client-urls\":\"http://127.0.0.1:42983\",\"advertise-peer-urls\":\"http://127.0.0.1:38611\",\"name\":\"pd\",\"data-dir\":\"/tmp/test_pd2640731814\",\"force-new-cluster\":false,\"enable-grpc-gateway\":true,\"initial-cluster\":\"pd=http://127.0.0.1:38611\",\"initial-cluster-state\":\"new\",\"lease\":1,\"log\":{\"level\":\"\",\"format\":\"\",\"disable-timestamp\":false,\"file\":{\"filename\":\"\",\"max-size\":0,\"max-days\":0,\"max-backups\":0},\"development\":false,\"disable-caller\":false,\"disable-stacktrace\":false,\"disable-error-verbose\":false,\"sampling\":null},\"log-file\":\"\",\"log-level\":\"\",\"tso-save-interval\":\"200ms\",\"schedule\":{\"patrol-region-interval\":\"100ms\",\"max-store-down-time\":\"30m0s\",\"leader-schedule-limit\":4,\"region-schedule-limit\":2048,\"replica-schedule-limit\":64,\"schedulers-v2\":[{\"type\":\"balance-region\",\"args\":null,\"disable\":false,\"args-payload\":\"\"},{\"type\":\"balance-leader\",\"args\":null,\"disable\":false,\"args-payload\":\"\"}]},\"replication\":{\"max-replicas\":3},\"pd-server\":{\"max-reset-ts-gap\":86400000000000},\"quota-backend-bytes\":\"0B\",\"auto-compaction-mode\":\"periodic\",\"auto-compaction-retention-v2\":\"1h\",\"TickInterval\":\"100ms\",\"ElectionInterval\":\"3s\",\"security\":{\"cacert-path\":\"\",\"cert-path\":\"\",\"key-path\":\"\"},\"WarningMsgs\":null,\"DisableStrictReconfigCheck\":true,\"HeartbeatStreamBindInterval\":\"1m0s\",\"LeaderPriorityCheckInterval\":\"100ms\"}"]
+[2023/08/31 11:50:07.156 +08:00] [INFO] [server.go:159] ["start embed etcd"]
+[2023/08/31 11:50:07.156 +08:00] [INFO] [etcd.go:117] ["configuring peer listeners"] [listen-peer-urls="[http://127.0.0.1:38611]"]
+[2023/08/31 11:50:07.156 +08:00] [INFO] [etcd.go:127] ["configuring client listeners"] [listen-client-urls="[http://127.0.0.1:42983]"]
+[2023/08/31 11:50:07.156 +08:00] [INFO] [etcd.go:602] ["pprof is enabled"] [path=/debug/pprof]
+[2023/08/31 11:50:07.157 +08:00] [INFO] [etcd.go:299] ["starting an etcd server"] [etcd-version=3.4.3] [git-sha="Not provided (use ./build instead of go build)"] [go-version=go1.20] [go-os=linux] [go-arch=amd64] [max-cpu-set=16] [max-cpu-available=16] [member-initialized=false] [name=pd] [data-dir=/tmp/test_pd2640731814] [wal-dir=] [wal-dir-dedicated=] [member-dir=/tmp/test_pd2640731814/member] [force-new-cluster=false] [heartbeat-interval=100ms] [election-timeout=3s] [initial-election-tick-advance=true] [snapshot-count=100000] [snapshot-catchup-entries=5000] [initial-advertise-peer-urls="[http://127.0.0.1:38611]"] [listen-peer-urls="[http://127.0.0.1:38611]"] [advertise-client-urls="[http://127.0.0.1:42983]"] [listen-client-urls="[http://127.0.0.1:42983]"] [listen-metrics-urls="[]"] [cors="[*]"] [host-whitelist="[*]"] [initial-cluster="pd=http://127.0.0.1:38611"] [initial-cluster-state=new] [initial-cluster-token=etcd-cluster] [quota-size-bytes=2147483648] [pre-vote=false] [initial-corrupt-check=false] [corrupt-check-time-interval=0s] [auto-compaction-mode=periodic] [auto-compaction-retention=1h0m0s] [auto-compaction-interval=1h0m0s] [discovery-url=] [discovery-proxy=]
+[2023/08/31 11:50:07.237 +08:00] [INFO] [backend.go:79] ["opened backend db"] [path=/tmp/test_pd2640731814/member/snap/db] [took=80.36977ms]
+[2023/08/31 11:50:07.255 +08:00] [INFO] [raft.go:456] ["starting local member"] [local-member-id=bcaaec2033fbcb01] [cluster-id=d1f53b1975aa5884]
+[2023/08/31 11:50:07.255 +08:00] [INFO] [raft.go:1530] ["bcaaec2033fbcb01 switched to configuration voters=()"]
+[2023/08/31 11:50:07.255 +08:00] [INFO] [raft.go:700] ["bcaaec2033fbcb01 became follower at term 0"]
+[2023/08/31 11:50:07.256 +08:00] [INFO] [raft.go:383] ["newRaft bcaaec2033fbcb01 [peers: [], term: 0, commit: 0, applied: 0, lastindex: 0, lastterm: 0]"]
+[2023/08/31 11:50:07.256 +08:00] [INFO] [raft.go:700] ["bcaaec2033fbcb01 became follower at term 1"]
+[2023/08/31 11:50:07.256 +08:00] [INFO] [raft.go:1530] ["bcaaec2033fbcb01 switched to configuration voters=(13594938048226511617)"]
+[2023/08/31 11:50:07.285 +08:00] [WARN] [store.go:1317] ["simple token is not cryptographically signed"]
+[2023/08/31 11:50:07.297 +08:00] [INFO] [quota.go:98] ["enabled backend quota with default value"] [quota-name=v3-applier] [quota-size-bytes=2147483648] [quota-size="2.1 GB"]
+[2023/08/31 11:50:07.308 +08:00] [INFO] [server.go:792] ["starting etcd server"] [local-member-id=bcaaec2033fbcb01] [local-server-version=3.4.3] [cluster-version=to_be_decided]
+[2023/08/31 11:50:07.309 +08:00] [INFO] [server.go:658] ["started as single-node; fast-forwarding election ticks"] [local-member-id=bcaaec2033fbcb01] [forward-ticks=29] [forward-duration=2.9s] [election-ticks=30] [election-timeout=3s]
+[2023/08/31 11:50:07.310 +08:00] [INFO] [raft.go:1530] ["bcaaec2033fbcb01 switched to configuration voters=(13594938048226511617)"]
+[2023/08/31 11:50:07.310 +08:00] [INFO] [cluster.go:392] ["added member"] [cluster-id=d1f53b1975aa5884] [local-member-id=bcaaec2033fbcb01] [added-peer-id=bcaaec2033fbcb01] [added-peer-peer-urls="[http://127.0.0.1:38611]"]
+[2023/08/31 11:50:07.312 +08:00] [INFO] [etcd.go:576] ["serving peer traffic"] [address=127.0.0.1:38611]
+[2023/08/31 11:50:07.312 +08:00] [INFO] [etcd.go:241] ["now serving peer/client/metrics"] [local-member-id=bcaaec2033fbcb01] [initial-advertise-peer-urls="[http://127.0.0.1:38611]"] [listen-peer-urls="[http://127.0.0.1:38611]"] [advertise-client-urls="[http://127.0.0.1:42983]"] [listen-client-urls="[http://127.0.0.1:42983]"] [listen-metrics-urls="[]"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [raft.go:923] ["bcaaec2033fbcb01 is starting a new election at term 1"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [raft.go:713] ["bcaaec2033fbcb01 became candidate at term 2"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [raft.go:824] ["bcaaec2033fbcb01 received MsgVoteResp from bcaaec2033fbcb01 at term 2"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [raft.go:765] ["bcaaec2033fbcb01 became leader at term 2"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [node.go:325] ["raft.node: bcaaec2033fbcb01 elected leader bcaaec2033fbcb01 at term 2"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [server.go:2016] ["published local member to cluster through raft"] [local-member-id=bcaaec2033fbcb01] [local-member-attributes="{Name:pd ClientURLs:[http://127.0.0.1:42983]}"] [request-path=/0/members/bcaaec2033fbcb01/attributes] [cluster-id=d1f53b1975aa5884] [publish-timeout=11s]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [server.go:189] ["create etcd v3 client"] [endpoints="[http://127.0.0.1:42983]"]
+[2023/08/31 11:50:09.357 +08:00] [INFO] [server.go:2501] ["setting up initial cluster version"] [cluster-version=3.4]
+[2023/08/31 11:50:09.363 +08:00] [INFO] [serve.go:139] ["serving client traffic insecurely; this is strongly discouraged!"] [address=127.0.0.1:42983]
+[2023/08/31 11:50:09.368 +08:00] [INFO] [cluster.go:558] ["set initial cluster version"] [cluster-id=d1f53b1975aa5884] [local-member-id=bcaaec2033fbcb01] [cluster-version=3.4]
+[2023/08/31 11:50:09.385 +08:00] [INFO] [capability.go:76] ["enabled capabilities for version"] [cluster-version=3.4]
+[2023/08/31 11:50:09.385 +08:00] [INFO] [server.go:2533] ["cluster version is updated"] [cluster-version=3.4]
+[2023/08/31 11:50:09.387 +08:00] [INFO] [server.go:226] ["init cluster id"] [cluster-id=7273328731155673712]
+[2023/08/31 11:50:09.393 +08:00] [INFO] [server.go:599] ["start to campaign leader"] [campaign-leader-name=pd]
+[2023/08/31 11:50:09.401 +08:00] [INFO] [server.go:616] ["campaign leader ok"] [campaign-leader-name=pd]
+[2023/08/31 11:50:09.407 +08:00] [INFO] [tso.go:129] ["sync and save timestamp"] [last=1754/08/30 22:43:41.128 +00:00] [save=2023/08/31 11:50:09.606 +08:00] [next=2023/08/31 11:50:09.406 +08:00]
+[2023/08/31 11:50:09.412 +08:00] [INFO] [server.go:636] ["PD cluster leader is ready to serve"] [leader-name=pd]
+[2023/08/31 11:50:09.499 +08:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=1000]
+[2023/08/31 11:50:09.500 +08:00] [INFO] [server.go:333] ["try to bootstrap raft cluster"] [cluster-id=7273328731155673712] [request="header:<cluster_id:7273328731155673712 > store:<id:1 address:\"127.0.0.1:0\" > "]
+[2023/08/31 11:50:09.505 +08:00] [INFO] [server.go:383] ["bootstrap cluster ok"] [cluster-id=7273328731155673712]
+[2023/08/31 11:50:09.512 +08:00] [INFO] [cluster.go:184] ["load stores"] [count=1] [cost=1.771251ms]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:125] ["coordinator starts to collect cluster information"]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:128] ["coordinator has finished cluster information preparation"]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:138] ["coordinator starts to run schedulers"]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:202] ["create scheduler"] [scheduler-name=balance-region-scheduler]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:202] ["create scheduler"] [scheduler-name=balance-leader-scheduler]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [coordinator.go:85] ["coordinator starts patrol regions"]
+[2023/08/31 11:50:09.513 +08:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:2 address:\"127.0.1.1:0\" "]
+[2023/08/31 11:50:09.514 +08:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:3 address:\"127.0.1.1:1\" "]
+[2023/08/31 11:50:09.514 +08:00] [INFO] [grpc_service.go:222] ["put store ok"] [store="id:4 address:\"127.0.1.1:2\" "]
+[2023/08/31 11:50:09.522 +08:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=2000]
+[2023/08/31 11:50:09.532 +08:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=3000]
+[2023/08/31 11:50:09.539 +08:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=4000]
+[2023/08/31 11:50:09.547 +08:00] [INFO] [id.go:110] ["idAllocator allocates a new id"] [alloc-id=5000]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [server.go:271] ["closing server"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [server.go:679] ["server is closed, exit etcd leader loop"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [server.go:662] ["server is closed"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [coordinator.go:308] ["scheduler has been stopped"] [scheduler-name=balance-leader-scheduler] [error="context canceled"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [cluster.go:201] ["background jobs has been stopped"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [coordinator.go:308] ["scheduler has been stopped"] [scheduler-name=balance-region-scheduler] [error="context canceled"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [cluster.go:218] ["coordinator is stopping"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [coordinator.go:92] ["patrol regions has been stopped"]
+[2023/08/31 11:50:09.610 +08:00] [INFO] [cluster.go:214] ["coordinator has been stopped"]
+[2023/08/31 11:50:09.612 +08:00] [INFO] [server.go:572] ["server is closed, return leader loop"]
+[2023/08/31 11:50:09.612 +08:00] [INFO] [etcd.go:360] ["closing etcd server"] [name=pd] [data-dir=/tmp/test_pd2640731814] [advertise-peer-urls="[http://127.0.0.1:38611]"] [advertise-client-urls="[http://127.0.0.1:42983]"]
+[2023/08/31 11:50:09.612 +08:00] [INFO] [server.go:1464] ["skipped leadership transfer for single voting member cluster"] [local-member-id=bcaaec2033fbcb01] [current-leader-member-id=bcaaec2033fbcb01]
+[2023/08/31 11:50:09.612 +08:00] [WARN] [grpclog.go:60] ["transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:42983->127.0.0.1:44978: use of closed network connection"]
+[2023/08/31 11:50:09.613 +08:00] [WARN] [grpclog.go:60] ["grpc: addrConn.createTransport failed to connect to {127.0.0.1:42983 0  <nil>}. Err :connection error: desc = \"transport: Error while dialing dial tcp 127.0.0.1:42983: connect: connection refused\". Reconnecting..."]
+[2023/08/31 11:50:09.613 +08:00] [WARN] [grpclog.go:60] ["transport: http2Server.HandleStreams failed to read frame: read tcp 127.0.0.1:42983->127.0.0.1:44980: use of closed network connection"]
+[2023/08/31 11:50:09.629 +08:00] [INFO] [etcd.go:555] ["stopping serving peer traffic"] [address=127.0.0.1:38611]
+[2023/08/31 11:50:09.630 +08:00] [INFO] [etcd.go:562] ["stopped serving peer traffic"] [address=127.0.0.1:38611]
+[2023/08/31 11:50:09.630 +08:00] [INFO] [etcd.go:364] ["closed etcd server"] [name=pd] [data-dir=/tmp/test_pd2640731814] [advertise-peer-urls="[http://127.0.0.1:38611]"] [advertise-client-urls="[http://127.0.0.1:42983]"]
+[2023/08/31 11:50:09.630 +08:00] [INFO] [server.go:290] ["close server"]
 OK: 18 passed
---- PASS: TestServer (1.41s)
+--- PASS: TestServer (2.50s)
 PASS
-ok  	github.com/pingcap-incubator/tinykv/scheduler/server	1.434s
+ok  	github.com/pingcap-incubator/tinykv/scheduler/server	2.527s
 === RUN   TestSchedulers
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:region,balance, region:3(0,0), createAt:2023-08-30 16:51:45.886484813 +0000 UTC m=+0.010101256, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 10 on store 4, remove peer on store 1])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:region,balance, region:3(0,0), createAt:2023-08-30 16:51:45.886700718 +0000 UTC m=+0.010317149, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 11 on store 4, remove peer on store 1])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 1} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.887099177 +0000 UTC m=+0.010715611, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 2 on store 1, transfer leader from store 4 to store 1, remove peer on store 4])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 2} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.887223453 +0000 UTC m=+0.010839884, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 3 on store 2, transfer leader from store 4 to store 2, remove peer on store 4])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 2} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.887271286 +0000 UTC m=+0.010887716, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4 on store 2, transfer leader from store 4 to store 2, remove peer on store 4])
-
-----------------------------------------------------------------------
-FAIL: balance_test.go:50: testBalanceRegionSchedulerSuite.TestReplicas13C
-
-balance_test.go:77:
-    c.Assert(sb.Schedule(tc), IsNil)
-... value *operator.Operator = &operator.Operator{desc:"balance-region-scheduler", brief:"mv peer: store 4 to 2", regionID:0x1, regionEpoch:(*metapb.RegionEpoch)(nil), kind:0x23, steps:[]operator.OpStep{operator.AddPeer{ToStore:0x2, PeerID:0x4}, operator.TransferLeader{FromStore:0x4, ToStore:0x2}, operator.RemovePeer{FromStore:0x4}}, currentStep:0, createTime:time.Time{wall:0xc133fac874e2af76, ext:10887716, loc:(*time.Location)(0x122c3c0)}, startTime:time.Time{wall:0x0, ext:0, loc:(*time.Location)(nil)}, stepTime:1693414305887271386, level:1} ("balance-region-scheduler {mv peer: store 4 to 2} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.887271286 +0000 UTC m=+0.010887716, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4 on store 2, transfer leader from store 4 to store 2, remove peer on store 4])")
-
-balance_region.go:138: [info] No region to remove
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.890032081 +0000 UTC m=+0.013648512, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4 on store 4, transfer leader from store 1 to store 2, remove peer on store 1])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 5} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.890088264 +0000 UTC m=+0.013704697, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 5 on store 5, transfer leader from store 1 to store 2, remove peer on store 1])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 6} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.890131449 +0000 UTC m=+0.013747882, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 6 on store 6, transfer leader from store 1 to store 2, remove peer on store 1])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 6} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.890184364 +0000 UTC m=+0.013800798, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 7 on store 6, transfer leader from store 1 to store 2, remove peer on store 1])
-
-----------------------------------------------------------------------
-FAIL: balance_test.go:83: testBalanceRegionSchedulerSuite.TestReplicas33C
-
-balance_test.go:116:
-    testutil.CheckTransferPeer(c, sb.Schedule(tc), operator.OpBalance, 1, 5)
-/home/xl/go/src/tinykv/scheduler/pkg/testutil/operator_check.go:58:
-    c.Assert(op.Step(0).(operator.AddPeer).ToStore, check.Equals, targetID)
-... obtained uint64 = 0x6
-... expected uint64 = 0x5
-
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.8931121 +0000 UTC m=+0.016728549, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 6 on store 6, remove peer on store 5])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.893173401 +0000 UTC m=+0.016789834, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 7 on store 6, remove peer on store 5])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 1} (kind:region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.893253997 +0000 UTC m=+0.016870430, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 13 on store 1, remove peer on store 5])
-balance_region.go:165: [info] New Operator: balance-region-scheduler {mv peer: store 11 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-30 16:51:45.893341437 +0000 UTC m=+0.016957867, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 19 on store 6, remove peer on store 11])
-OOPS: 2 passed, 2 FAILED
---- FAIL: TestSchedulers (0.01s)
-FAIL
-FAIL	github.com/pingcap-incubator/tinykv/scheduler/server/schedulers	0.023s
-FAIL
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:region,balance, region:3(0,0), createAt:2023-08-31 11:50:10.731963468 +0800 CST m=+0.014451078, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 10 on store 4, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:region,balance, region:3(0,0), createAt:2023-08-31 11:50:10.732223793 +0800 CST m=+0.014711381, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 11 on store 4, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 1} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732388298 +0800 CST m=+0.014875887, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 2 on store 1, transfer leader from store 4 to store 1, remove peer on store 4])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 2} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732441778 +0800 CST m=+0.014929369, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 3 on store 2, transfer leader from store 4 to store 2, remove peer on store 4])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 4 to 2} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732461386 +0800 CST m=+0.014948977, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4 on store 2, transfer leader from store 4 to store 2, remove peer on store 4])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 4} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732601299 +0800 CST m=+0.015088887, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 4 on store 4, transfer leader from store 1 to store 2, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 5} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.73262648 +0800 CST m=+0.015114069, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 5 on store 5, transfer leader from store 1 to store 2, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 6} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732662933 +0800 CST m=+0.015150521, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 6 on store 6, transfer leader from store 1 to store 2, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 1 to 5} (kind:leader,region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.73269398 +0800 CST m=+0.015181568, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 7 on store 5, transfer leader from store 1 to store 2, remove peer on store 1])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732868074 +0800 CST m=+0.015355663, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 6 on store 6, remove peer on store 5])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.732986119 +0800 CST m=+0.015473712, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 7 on store 6, remove peer on store 5])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 5 to 1} (kind:region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.733017367 +0800 CST m=+0.015504956, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 13 on store 1, remove peer on store 5])
+balance_region.go:162: [info] New Operator: balance-region-scheduler {mv peer: store 11 to 6} (kind:region,balance, region:1(0,0), createAt:2023-08-31 11:50:10.733055042 +0800 CST m=+0.015542630, startAt:0001-01-01 00:00:00 +0000 UTC, currentStep:0, steps:[add peer 19 on store 6, remove peer on store 11])
+OK: 4 passed
+--- PASS: TestSchedulers (0.00s)
+PASS
+ok  	github.com/pingcap-incubator/tinykv/scheduler/server/schedulers	0.024s
